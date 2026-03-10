@@ -34,7 +34,7 @@ export default function SettingsPage({
   const handleClearData = () => {
     if (window.confirm('هل أنت متأكد من حذف جميع بياناتك (المواد، السجل، وساعات الدراسة)؟ لا يمكن التراجع عن هذا الإجراء.')) {
       if (window.confirm('تأكيد أخير: سيتم مسح كل شيء!')) {
-        localStorage.clear();
+        localStorage.removeItem('apex-tracker-data'); // Keeps theme settings
         window.location.reload();
       }
     }

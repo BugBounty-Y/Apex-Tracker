@@ -57,21 +57,21 @@ function AppInner() {
   const [newSubjectData, setNewSubjectData] = useState({ name: '', goalHours: 50 });
 
   // --- Timer callbacks ---
-  const onTickFocus = useCallback(() => {
-    if (!activeSubject) return;
+  const onTickFocus = useCallback((elapsed = 1) => {
+    if (!elapsed || elapsed <= 0 || !activeSubject) return;
     setSubjects(prev => {
       if (!prev[activeSubject]) return prev;
       return {
         ...prev,
         [activeSubject]: {
           ...prev[activeSubject],
-          studiedSeconds: prev[activeSubject].studiedSeconds + 1,
+          studiedSeconds: prev[activeSubject].studiedSeconds + elapsed,
         },
       };
     });
     setDailyLog(prev => {
       const key = getTodayKey();
-      return { ...prev, [key]: (prev[key] || 0) + 1 };
+      return { ...prev, [key]: (prev[key] || 0) + elapsed };
     });
   }, [activeSubject]);
 
@@ -94,7 +94,10 @@ function AppInner() {
 
   // --- Persist to localStorage ---
   useEffect(() => {
-    saveData({ subjects, dailyLog, dailyGoal, userProfile });
+    const timeout = setTimeout(() => {
+      saveData({ subjects, dailyLog, dailyGoal, userProfile });
+    }, 1000); // Debounce save to reduce IO blocking
+    return () => clearTimeout(timeout);
   }, [subjects, dailyLog, dailyGoal, userProfile]);
 
   // --- Day change detection ---

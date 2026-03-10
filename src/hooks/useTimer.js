@@ -28,46 +28,48 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete }) {
   onTickFocusRef.current = onTickFocus;
   onSessionCompleteRef.current = onSessionComplete;
 
-  // Core timer engine — clean interval without dependency on subjects
+  // Core timer engine — safe against tab throttling
   useEffect(() => {
     if (!isRunning || timeLeft <= 0) return;
 
+    const endTime = Date.now() + timeLeft * 1000;
+    let lastTickTime = Date.now();
+
     const interval = setInterval(() => {
-      setTimeLeft(prev => {
-        const next = prev - 1;
+      const now = Date.now();
+      const nextTimeLeft = Math.round((endTime - now) / 1000);
+      
+      const elapsedSinceLastTick = Math.max(0, Math.round((now - lastTickTime) / 1000));
+      lastTickTime = now;
 
-        // Track study time only during focus mode
+      if (nextTimeLeft <= 0) {
+        setTimeLeft(0);
+        setIsRunning(false);
+        setTimerComplete(true);
+        playNotificationSound();
+
         if (timerModeRef.current === 'focus' && activeSubjectRef.current) {
-          onTickFocusRef.current?.();
+          onTickFocusRef.current?.(elapsedSinceLastTick);
+          onSessionCompleteRef.current?.();
         }
 
-        // Timer complete
-        if (next <= 0) {
-          setIsRunning(false);
-          setTimerComplete(true);
-          playNotificationSound();
-
-          if (timerModeRef.current === 'focus' && activeSubjectRef.current) {
-            onSessionCompleteRef.current?.();
-          }
-
-          // Try browser notification
-          if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification('⏰ انتهى الوقت!', {
-              body: timerModeRef.current === 'focus'
-                ? `أحسنت! انتهت جلسة ${activeSubjectRef.current || 'الدراسة'}`
-                : 'انتهت فترة الراحة، عد للدراسة!',
-            });
-          }
-
-          return 0;
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('⏰ انتهى الوقت!', {
+            body: timerModeRef.current === 'focus'
+              ? `أحسنت! المشوار اكتمل في ${activeSubjectRef.current || 'هذه الجلسة'}`
+              : 'انتهت فترة الراحة، استعد للدراسة!',
+          });
         }
-        return next;
-      });
+      } else {
+        setTimeLeft(nextTimeLeft);
+        if (timerModeRef.current === 'focus' && activeSubjectRef.current) {
+          onTickFocusRef.current?.(elapsedSinceLastTick);
+        }
+      }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isRunning, timeLeft]);
+  }, [isRunning]); // Removes timeLeft dependency to prevent loop drift
 
   const toggleTimer = useCallback(() => {
     if (!activeSubject) return;

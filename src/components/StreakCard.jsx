@@ -16,13 +16,14 @@ export default function StreakCard({ dailyLog, streak }) {
     for (let i = 0; i < 7; i++) {
       const d = new Date(today);
       d.setDate(today.getDate() - adjustedDay + i);
-      const dateKey = d.toISOString().slice(0, 10);
+      // Ensure local timezone is used
+      const dateKey = new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
       const seconds = dailyLog[dateKey] || 0;
 
       days.push({
         label: labels[i],
         isToday: i === adjustedDay,
-        hasStudied: seconds >= 60,
+        hasStudied: seconds >= 1500, // 25 minutes minimum
         isFuture: i > adjustedDay
       });
     }

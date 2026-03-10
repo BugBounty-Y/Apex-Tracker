@@ -36,25 +36,25 @@ export function calculateStreak(dailyLog) {
   if (!dailyLog || Object.keys(dailyLog).length === 0) return 0;
 
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
   let streak = 0;
-  let checkDate = new Date(today);
+  // Use local time to avoid UTC drift
+  let checkDate = new Date(today.getTime() - (today.getTimezoneOffset() * 60000));
 
-  // Check today first
-  const todayKey = checkDate.toISOString().slice(0, 10);
+  const getLocKey = (d) => new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
+
+  const todayKey = getLocKey(checkDate);
   const todaySeconds = dailyLog[todayKey] || 0;
 
-  // If no study today yet, start checking from yesterday
-  if (todaySeconds < 60) {
+  // Streak requires 25 minutes (1500 seconds)
+  if (todaySeconds < 1500) {
     checkDate.setDate(checkDate.getDate() - 1);
   }
 
-  // Count consecutive days
-  while (true) {
-    const key = checkDate.toISOString().slice(0, 10);
+  // Count consecutive days (safety limit 3650 days = 10 years)
+  while (streak < 3650) {
+    const key = getLocKey(checkDate);
     const seconds = dailyLog[key] || 0;
-    if (seconds >= 60) {
+    if (seconds >= 1500) {
       streak++;
       checkDate.setDate(checkDate.getDate() - 1);
     } else {
