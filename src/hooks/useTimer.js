@@ -101,8 +101,8 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete }) {
       bg: 'bg-purple-500', from: 'from-purple-400', to: 'to-indigo-600',
     };
     return {
-      stroke: 'stroke-blue-500', glow: 'shadow-blue-500/40',
-      bg: 'bg-blue-600', from: 'from-blue-400', to: 'to-indigo-600',
+      stroke: 'stroke-violet-500', glow: 'shadow-violet-500/30',
+      bg: 'bg-violet-600', from: 'from-violet-400', to: 'to-indigo-600',
     };
   };
 

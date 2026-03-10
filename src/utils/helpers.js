@@ -20,7 +20,7 @@ export function formatHoursMins(sec) {
   if (h > 0 && m > 0) return `${h}h ${m}m`;
   if (h > 0) return `${h}h`;
   if (m > 0) return `${m}m`;
-  return '<1m';
+  return '-';
 }
 
 /**

@@ -2,16 +2,8 @@ import { Icons } from './Icons';
 import { formatHoursMins } from '../utils/helpers';
 import { getColorTheme, getRemainingDays } from '../utils/constants';
 
-/**
- * SubjectCard — individual subject card for the dashboard grid.
- *
- * Fixes from original:
- * - Uses pre-built Tailwind classes from theme lookup (no dynamic string construction)
- * - Uses dynamic remaining days instead of static TOTAL_DAYS
- * - Safe division (avoids goalSec = 0)
- */
 export default function SubjectCard({ name, data, isActive, isTimerRunning, onSubjectClick, onEdit }) {
-  const goalSec = Math.max(1, data.goalHours * 3600); // prevent division by zero
+  const goalSec = Math.max(1, data.goalHours * 3600);
   const remainSec = Math.max(0, goalSec - data.studiedSeconds);
   const progPercent = Math.min(100, (data.studiedSeconds / goalSec) * 100);
 
@@ -26,86 +18,83 @@ export default function SubjectCard({ name, data, isActive, isTimerRunning, onSu
   return (
     <div
       onClick={() => onSubjectClick(name)}
-      className={`cursor-pointer bg-white rounded-[1.5rem] p-5 border-2 transition-all duration-300 group flex flex-col h-full relative overflow-hidden ${
+      className={`cursor-pointer rounded-2xl p-5 transition-all duration-300 group flex flex-col h-full relative overflow-hidden ${
         isActive
-          ? `${theme.border} shadow-lg ${theme.shadow} scale-[1.02] ring-4 ${theme.ring} ${theme.light}`
-          : `border-slate-100 ${theme.hoverBorder} hover:shadow-xl hover:-translate-y-1`
+          ? 'bg-zinc-800/80 text-white ring-1 ring-violet-500/60 shadow-lg shadow-violet-500/5'
+          : 'bg-zinc-900/50 border border-zinc-800/60 hover:border-zinc-700 hover:bg-zinc-900/80 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/20'
       }`}
       role="button"
       tabIndex={0}
       aria-label={`${name} — ${progPercent.toFixed(0)}% مكتمل`}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSubjectClick(name); }}}
     >
-      {/* Glow effect */}
-      <div className={`absolute -top-12 -left-12 w-32 h-32 rounded-full blur-3xl pointer-events-none transition-transform group-hover:scale-150 duration-700 ${theme.glow}`} />
-      
-      {/* Arrow indicator */}
-      <div className="absolute top-4 left-4 p-2 rounded-full bg-slate-900 text-white opacity-0 group-hover:opacity-100 transition-opacity transform translate-x-2 group-hover:translate-x-0 shadow-lg z-20">
-        <Icons.ArrowRight />
-      </div>
-
       {/* Header */}
-      <div className="flex justify-between items-start mb-6 z-10 relative">
-        <div className="flex items-center gap-3 w-5/6">
-          <div className={`w-1.5 h-10 rounded-full ${theme.fill} shadow-sm ${isActive && isTimerRunning ? 'animate-pulse' : ''}`} />
-          <h3 className={`font-black text-lg leading-tight transition-colors ${isActive ? theme.text : `text-slate-800 ${theme.groupHoverText}`}`}>{name}</h3>
+      <div className="flex justify-between items-start mb-4 z-10 relative">
+        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+          <div className={`w-1.5 h-7 rounded-full shrink-0 ${isActive ? 'bg-violet-400' : theme.fill} ${isActive && isTimerRunning ? 'animate-pulse' : ''}`} />
+          <h3 className="font-semibold text-[14px] leading-tight truncate text-white">{name}</h3>
         </div>
-        <div className="flex flex-col items-end gap-2 shrink-0">
-          <button
-            onClick={(e) => onEdit(name, e)}
-            className={`p-2 rounded-xl transition-all duration-200 ${isActive ? `bg-white ${theme.text} shadow-sm` : `bg-slate-50 text-slate-400 ${theme.hoverLight} ${theme.hoverText}`}`}
-            title="تعديل الإعدادات"
-            aria-label={`تعديل ${name}`}
-          >
-            <Icons.Edit />
-          </button>
-        </div>
+        <button
+          onClick={(e) => onEdit(name, e)}
+          className={`p-1.5 rounded-lg transition-all duration-200 shrink-0 z-30 ${
+            isActive
+              ? 'bg-white/10 text-white hover:bg-white/15'
+              : 'bg-transparent text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'
+          }`}
+          title="تعديل الإعدادات"
+          aria-label={`تعديل ${name}`}
+        >
+          <Icons.Edit />
+        </button>
       </div>
 
-      {/* Stats */}
-      <div className="mt-auto z-10 relative">
-        <div className="flex justify-between items-end mb-3">
+      {/* Stats Row */}
+      <div className="mt-auto z-10 relative space-y-3">
+        <div className="flex justify-between items-end">
           <div>
-            <div className="text-[10px] text-slate-400 font-black mb-1 uppercase tracking-wider">المنجز / الهدف</div>
-            <div className="font-black text-slate-900 text-xl tracking-tight">
-              {formatHoursMins(data.studiedSeconds)} <span className="text-sm font-bold text-slate-400">/ {data.goalHours}h</span>
+            <div className="text-[10px] font-medium mb-0.5 uppercase tracking-wider text-zinc-500">المنجز / الهدف</div>
+            <div className="font-semibold text-base tracking-tight text-zinc-200">
+              {formatHoursMins(data.studiedSeconds)} <span className="text-xs font-normal text-zinc-500">/ {data.goalHours}h</span>
             </div>
           </div>
-          <div className="text-right">
-            <div className={`text-2xl font-black mb-1 tracking-tighter ${isCompleted ? 'text-emerald-500' : theme.text}`}>
-              {progPercent.toFixed(1)}%
-            </div>
+          <div className={`text-lg font-bold tracking-tighter ${
+            isCompleted ? 'text-emerald-400' : 'text-violet-400'
+          }`}>
+            {progPercent.toFixed(1)}%
           </div>
         </div>
 
         {/* Progress bar */}
-        <div className="w-full h-3.5 bg-slate-100 rounded-full mb-5 overflow-hidden shadow-inner relative">
+        <div className="w-full h-1.5 rounded-full overflow-hidden bg-zinc-800">
           <div
-            className={`h-full rounded-full transition-all duration-1000 ease-out relative overflow-hidden ${isCompleted ? 'bg-emerald-500' : theme.fill}`}
+            className={`h-full rounded-full transition-all duration-1000 ease-out ${
+              isCompleted
+                ? 'bg-emerald-400'
+                : 'bg-gradient-to-l from-violet-500 to-violet-400'
+            }`}
             style={{ width: `${progPercent}%` }}
             role="progressbar"
             aria-valuenow={progPercent}
             aria-valuemin={0}
             aria-valuemax={100}
-          >
-            <div className="absolute top-0 left-0 w-full h-full bg-white/20 animate-pulse-glow" />
-          </div>
+          />
         </div>
 
-        {/* Daily requirement */}
-        <div className={`flex items-start gap-3 p-3.5 rounded-xl border-r-4 transition-colors ${
-          isActive
-            ? `bg-white ${theme.border} shadow-sm`
-            : `${theme.light} border-transparent ${theme.groupHoverBorder}`
-        }`}>
-          <div className={`mt-0.5 ${isActive ? theme.icon : `text-slate-400 ${theme.groupHoverIcon}`}`}>
+        {/* Bottom row */}
+        <div className="flex items-center justify-between pt-1">
+          <div className="flex items-center gap-1.5 text-xs text-zinc-500">
             <Icons.Wrench />
+            <span className="font-medium">يومياً:</span>
+            <span className="font-semibold text-zinc-300">
+              {isCompleted ? '✅' : `${dReqH}h ${dReqM}m`}
+            </span>
           </div>
-          <div className="flex flex-col">
-            <span className={`text-[11px] font-bold mb-0.5 ${isActive ? 'text-slate-600' : 'text-slate-500'}`}>الجرعة اليومية للإنهاء:</span>
-            <strong className={`text-base font-black ${isActive ? theme.text : 'text-slate-800'}`}>
-              {isCompleted ? '✅ مكتمل' : `${dReqH}h ${dReqM}m`}
-            </strong>
+          <div className={`text-[11px] font-semibold transition-all duration-200 ${
+            isActive
+              ? 'text-violet-400'
+              : 'text-zinc-600 group-hover:text-violet-400'
+          }`}>
+            {isActive ? '⏱️ نشط' : 'ابدأ ←'}
           </div>
         </div>
       </div>
