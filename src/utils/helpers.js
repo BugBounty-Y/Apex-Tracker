@@ -20,10 +20,38 @@ export function formatHoursMins(sec) {
 /**
  * Returns today's date string in YYYY-MM-DD format for daily tracking.
  * Uses local timezone to prevent UTC midnight drifting.
+ * If userProfile has a specific timezone (e.g., 'UTC+3'), it calculates based on that.
  */
-export function getTodayKey() {
+export function getTodayKey(userTimezone = 'auto') {
   const d = new Date();
-  return new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
+  
+  // If set to auto, use browser's local timezone offset
+  if (!userTimezone || userTimezone === 'auto') {
+    return new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
+  }
+
+  // Parse custom timezone (e.g., 'UTC+3' -> 3, 'UTC-5' -> -5)
+  try {
+    const offsetStr = userTimezone.replace('UTC', '');
+    let offsetMinutes = 0;
+    
+    if (offsetStr === '+5:30') { // Special case for India
+      offsetMinutes = 5.5 * 60;
+    } else {
+      offsetMinutes = Number(offsetStr) * 60;
+    }
+
+    if (isNaN(offsetMinutes)) throw new Error('Invalid offset');
+
+    // Calculate time using UTC milliseconds + custom offset
+    const utcTime = d.getTime() + (d.getTimezoneOffset() * 60000); // Convert local to true UTC
+    const customTime = utcTime + (offsetMinutes * 60000); // Add custom offset
+    
+    return new Date(customTime).toISOString().slice(0, 10);
+  } catch (e) {
+    // Fallback to auto on any parsing error
+    return new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
+  }
 }
 
 /**

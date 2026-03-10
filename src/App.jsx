@@ -46,7 +46,7 @@ function AppInner() {
   const todayStudiedSeconds = dailyLog[todayKey] || 0;
 
   // --- Streak (computed from daily log) ---
-  const streak = useMemo(() => calculateStreak(dailyLog), [dailyLog]);
+  const streak = useMemo(() => calculateStreak(dailyLog, userProfile?.timezone), [dailyLog, userProfile?.timezone]);
 
   // --- Modals State ---
   const [editingSubject, setEditingSubject] = useState(null);
@@ -70,10 +70,10 @@ function AppInner() {
       };
     });
     setDailyLog(prev => {
-      const key = getTodayKey();
+      const key = getTodayKey(userProfile?.timezone);
       return { ...prev, [key]: (prev[key] || 0) + elapsed };
     });
-  }, [activeSubject]);
+  }, [activeSubject, userProfile?.timezone]);
 
   const onSessionComplete = useCallback(() => {
     if (!activeSubject) return;
@@ -103,11 +103,11 @@ function AppInner() {
   // --- Day change detection ---
   useEffect(() => {
     const interval = setInterval(() => {
-      const currentKey = getTodayKey();
+      const currentKey = getTodayKey(userProfile?.timezone);
       if (currentKey !== todayKey) setTodayKey(currentKey);
     }, 30000);
     return () => clearInterval(interval);
-  }, [todayKey]);
+  }, [todayKey, userProfile?.timezone]);
 
   // --- Notification permission ---
   useEffect(() => {

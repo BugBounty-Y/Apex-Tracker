@@ -100,7 +100,7 @@ export default function DashboardPage({
           <StudyTimeCard todayStudiedSeconds={todayStudiedSeconds} dailyGoalHours={dailyGoal} onEditGoal={onEditGoal} />
         </div>
         <div className="md:col-span-5 xl:col-span-4">
-          <StreakCard dailyLog={dailyLog} streak={streak} />
+          <StreakCard dailyLog={dailyLog} streak={streak} userProfile={userProfile} />
         </div>
       </div>
 

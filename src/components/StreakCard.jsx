@@ -1,23 +1,48 @@
 import { useMemo } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 
-export default function StreakCard({ dailyLog, streak }) {
+export default function StreakCard({ dailyLog, streak, userProfile }) {
   const { isDark } = useTheme();
 
   const weekDays = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const currentDay = today.getDay();
-    const adjustedDay = currentDay === 0 ? 6 : currentDay - 1;
+    const userTimezone = userProfile?.timezone || 'auto';
+    
+    let offsetMinutes = 0;
+    if (userTimezone === 'auto') {
+      offsetMinutes = -new Date().getTimezoneOffset();
+    } else {
+      try {
+        const offsetStr = userTimezone.replace('UTC', '');
+        if (offsetStr === '+5:30') offsetMinutes = 5.5 * 60;
+        else offsetMinutes = Number(offsetStr) * 60;
+        if (isNaN(offsetMinutes)) offsetMinutes = -new Date().getTimezoneOffset();
+      } catch {
+        offsetMinutes = -new Date().getTimezoneOffset();
+      }
+    }
+
+    const getLocKey = (d) => {
+      const utcTime = d.getTime() + (d.getTimezoneOffset() * 60000);
+      return new Date(utcTime + (offsetMinutes * 60000)).toISOString().slice(0, 10);
+    };
+
+    // Construct "today" representation based on custom offset
+    const todayTarget = new Date(new Date().getTime() + (new Date().getTimezoneOffset() * 60000) + (offsetMinutes * 60000));
+    todayTarget.setHours(0, 0, 0, 0); // Not strictly clean due to date shifts, but we only need Day of Week
+    
+    // Fallback simple: use actual target day value
+    const currentDay = todayTarget.getDay(); // 0 is Sunday
+    const adjustedDay = currentDay === 0 ? 6 : currentDay - 1; // Start Monday (0) to Sunday (6)
 
     const days = [];
     const labels = ['ن', 'ث', 'ع', 'خ', 'ج', 'س', 'ح'];
 
+    // We iterate backwards/forwards relative to new Date()
     for (let i = 0; i < 7; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() - adjustedDay + i);
-      // Ensure local timezone is used
-      const dateKey = new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
+      const d = new Date();
+      d.setDate(d.getDate() - adjustedDay + i);
+      
+      const dateKey = getLocKey(d);
       const seconds = dailyLog[dateKey] || 0;
 
       days.push({

@@ -14,6 +14,7 @@ export default function SettingsPage({
   const [formData, setFormData] = useState({
     name: userProfile?.name || 'يحيى',
     examDate: userProfile?.examDate || '2026-06-06',
+    timezone: userProfile?.timezone || 'auto',
     dailyGoal: dailyGoal || 3,
   });
 
@@ -24,6 +25,7 @@ export default function SettingsPage({
     setUserProfile({
       name: formData.name.trim() || 'طالب',
       examDate: formData.examDate || '2026-06-06',
+      timezone: formData.timezone || 'auto',
     });
     setDailyGoal(Math.max(1, parseInt(formData.dailyGoal) || 1));
     
@@ -94,7 +96,7 @@ export default function SettingsPage({
             </div>
 
             {/* Exam Date Input */}
-            <div className="md:col-span-2">
+            <div>
               <label htmlFor="exam-date" className={labelCls} style={labelStyle}>تاريخ بداية الامتحانات</label>
               <input
                 id="exam-date"
@@ -107,6 +109,35 @@ export default function SettingsPage({
               />
               <p className="text-xs mt-2" style={{ color: 'var(--c-text-faint)' }}>
                 يستخدم لنظام العد التنازلي في الشريط الجانبي ولوحة التحكم.
+              </p>
+            </div>
+
+            {/* Timezone Input */}
+            <div>
+              <label htmlFor="timezone" className={labelCls} style={labelStyle}>المنطقة الزمنية</label>
+              <select
+                id="timezone"
+                value={formData.timezone}
+                onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
+                className={inputCls}
+                style={inputStyle}
+              >
+                <option value="auto">تلقائي (حسب نظام جهازك)</option>
+                <option value="UTC-12">توقيت هاواي (UTC-12)</option>
+                <option value="UTC-8">توقيت المحيط الهادئ (UTC-8)</option>
+                <option value="UTC-5">توقيت الساحل الشرقي لأمريكا (UTC-5)</option>
+                <option value="UTC+0">توقيت جرينتش / لندن (UTC+0)</option>
+                <option value="UTC+1">توقيت وسط أوروبا / المغرب (UTC+1)</option>
+                <option value="UTC+2">توقيت شرق أوروبا / مصر (UTC+2)</option>
+                <option value="UTC+3">توقيت السعودية / مكة المكرمة (UTC+3)</option>
+                <option value="UTC+4">توقيت الإمارات العربية المتحدة (UTC+4)</option>
+                <option value="UTC+5:30">توقيت الهند (UTC+5:30)</option>
+                <option value="UTC+8">توقيت الصين / ماليزيا (UTC+8)</option>
+                <option value="UTC+9">توقيت اليابان (UTC+9)</option>
+                <option value="UTC+11">توقيت أستراليا (UTC+11)</option>
+              </select>
+              <p className="text-xs mt-2" style={{ color: 'var(--c-text-faint)' }}>
+                لتحديد موعد بدء واستئناف يومك الدراسي، يؤثر على الاستمرارية.
               </p>
             </div>
           </div>
