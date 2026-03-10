@@ -61,17 +61,21 @@ export default function Sidebar({
         </div>
 
         {/* Countdown */}
-        <div className="mx-4 my-3 p-3.5 rounded-2xl border"
-          style={{ backgroundColor: isDark ? 'rgba(24,24,27,0.8)' : 'rgba(245,158,11,0.06)', borderColor: 'var(--c-border)' }}
+        <div className="mx-4 my-4 p-4 rounded-2xl border relative overflow-hidden group"
+          style={{
+            backgroundColor: isDark ? 'rgba(245,158,11,0.05)' : 'rgba(245,158,11,0.08)',
+            borderColor: isDark ? 'rgba(245,158,11,0.2)' : 'rgba(245,158,11,0.3)'
+          }}
         >
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-amber-500/10 rounded-xl text-amber-500">
+          <div className="absolute -top-10 -right-10 w-32 h-32 bg-amber-500/10 rounded-full blur-[30px] pointer-events-none group-hover:bg-amber-500/20 transition-colors duration-500" />
+          <div className="flex items-center gap-3 relative z-10">
+            <div className="p-2.5 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl text-white shadow-lg shadow-amber-500/20 animate-pulse-glow">
               <Icons.Target />
             </div>
             <div>
-              <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--c-text-faint)' }}>العد التنازلي للامتحان</div>
-              <div className="text-lg font-black mt-0.5 tabular-nums" style={{ color: 'var(--c-text)' }}>
-                {remainingDays} <span className="text-xs font-semibold" style={{ color: 'var(--c-text-faint)' }}>يوم متبقي</span>
+              <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: isDark ? '#fbbf24' : '#d97706' }}>العد التنازلي للامتحان</div>
+              <div className="text-xl font-black mt-0.5 tabular-nums text-amber-500">
+                {remainingDays} <span className="text-[11px] font-bold" style={{ color: isDark ? 'rgba(251,191,36,0.7)' : 'rgba(217,119,6,0.8)' }}>يوم متبقي</span>
               </div>
             </div>
           </div>

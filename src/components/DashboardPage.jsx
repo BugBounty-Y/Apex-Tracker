@@ -75,12 +75,20 @@ export default function DashboardPage({
                 <div className="h-full bg-gradient-to-l from-violet-500 to-violet-400 rounded-full transition-all duration-1000" style={{ width: `${overallProgress}%` }} />
               </div>
             </div>
-            <div className="backdrop-blur-sm rounded-xl p-4 border min-w-[100px]"
-              style={{ backgroundColor: 'var(--c-elevated)', borderColor: 'var(--c-border)' }}
+            <div className="backdrop-blur-md rounded-2xl p-4 lg:p-5 border relative overflow-hidden flex flex-col items-center justify-center min-w-[140px] shadow-lg group"
+              style={{
+                backgroundColor: isDark ? 'rgba(245, 158, 11, 0.08)' : 'rgba(245, 158, 11, 0.1)',
+                borderColor: isDark ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.3)',
+                boxShadow: isDark ? '0 10px 30px -10px rgba(245,158,11,0.15)' : '0 10px 30px -10px rgba(245,158,11,0.2)'
+              }}
             >
-              <div className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--c-text-faint)' }}>متبقي</div>
-              <div className="text-2xl font-bold tabular-nums text-amber-500">{remainingDays}</div>
-              <div className="text-[11px] font-medium mt-0.5" style={{ color: 'var(--c-text-faint)' }}>يوم للامتحان</div>
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-transparent pointer-events-none" />
+              <div className="relative z-10 flex items-center justify-center gap-1.5 mb-1.5 text-amber-500">
+                <span className="scale-[0.85]"><Icons.Target /></span>
+                <div className="text-[10px] font-bold uppercase tracking-widest text-amber-600" style={{ color: isDark ? '#fbbf24' : '#d97706' }}>موعد الامتحان</div>
+              </div>
+              <div className="relative z-10 text-3xl lg:text-4xl font-black tabular-nums tracking-tighter text-amber-500 drop-shadow-sm">{remainingDays}</div>
+              <div className="relative z-10 text-[11px] font-bold mt-1" style={{ color: isDark ? 'rgba(251,191,36,0.7)' : '#d97706' }}>يوم متبقي</div>
             </div>
           </div>
         </div>
