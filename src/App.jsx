@@ -3,16 +3,20 @@ import { Icons } from './components/Icons';
 import Sidebar from './components/Sidebar';
 import DashboardPage from './components/DashboardPage';
 import TimerPage from './components/TimerPage';
+import SettingsPage from './components/SettingsPage';
 import Modal from './components/Modal';
 import { useTimer } from './hooks/useTimer';
 import { initialSubjects, COLOR_KEYS, colorStringForKey } from './utils/constants';
 import { getTodayKey } from './utils/helpers';
 import { loadData, saveData, calculateStreak } from './utils/storage';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 
 // ==========================================
-// MAIN APPLICATION COMPONENT
+// INNER APP (needs ThemeProvider as parent)
 // ==========================================
-export default function App() {
+function AppInner() {
+  const { theme, isDark } = useTheme();
+
   // --- Data State (loaded from localStorage) ---
   const [subjects, setSubjects] = useState(() => {
     const saved = loadData();
@@ -27,6 +31,11 @@ export default function App() {
   const [dailyGoal, setDailyGoal] = useState(() => {
     const saved = loadData();
     return saved?.dailyGoal || 3;
+  });
+
+  const [userProfile, setUserProfile] = useState(() => {
+    const saved = loadData();
+    return saved?.userProfile || { name: 'يحيى', examDate: '2026-06-06' };
   });
 
   const [activeSubject, setActiveSubject] = useState(null);
@@ -85,8 +94,8 @@ export default function App() {
 
   // --- Persist to localStorage ---
   useEffect(() => {
-    saveData({ subjects, dailyLog, dailyGoal });
-  }, [subjects, dailyLog, dailyGoal]);
+    saveData({ subjects, dailyLog, dailyGoal, userProfile });
+  }, [subjects, dailyLog, dailyGoal, userProfile]);
 
   // --- Day change detection ---
   useEffect(() => {
@@ -191,11 +200,22 @@ export default function App() {
     setIsAddModalOpen(false);
   };
 
+  // Input/label/button style helpers for modals (theme-aware)
+  const inputCls = "w-full rounded-xl px-4 py-3 font-medium focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/40 outline-none transition-all border";
+  const inputStyle = { backgroundColor: 'var(--c-input)', borderColor: 'var(--c-border)', color: 'var(--c-text)' };
+  const labelCls = "block text-sm font-semibold mb-2";
+  const labelStyle = { color: 'var(--c-text-sub)' };
+  const cancelBtnStyle = { color: 'var(--c-text-muted)' };
+
   // ==========================================
   // RENDER — Sidebar Layout
   // ==========================================
   return (
-    <div dir="rtl" className="h-screen flex bg-[#09090b] font-sans text-zinc-200 overflow-hidden selection:bg-violet-500/30">
+    <div
+      dir="rtl"
+      className={`h-screen flex font-sans overflow-hidden ${theme === 'light' ? 'light' : ''}`}
+      style={{ backgroundColor: 'var(--c-bg)', color: 'var(--c-text)', '--selection-color': 'var(--c-selection)' }}
+    >
       {/* Sidebar */}
       <Sidebar
         currentView={currentView}
@@ -204,6 +224,7 @@ export default function App() {
         todayStudiedSeconds={todayStudiedSeconds}
         isTimerRunning={timer.isRunning}
         activeSubject={activeSubject}
+        userProfile={userProfile}
       />
 
       {/* Main Content */}
@@ -222,6 +243,7 @@ export default function App() {
               dailyLog={dailyLog}
               streak={streak}
               onEditGoal={() => { setTempGoal(dailyGoal); setIsGoalModalOpen(true); }}
+              userProfile={userProfile}
             />
           )}
 
@@ -231,6 +253,15 @@ export default function App() {
               activeSubject={activeSubject}
               onSelectSubject={handleSelectSubjectFromTimer}
               timer={timer}
+            />
+          )}
+
+          {currentView === 'settings' && (
+            <SettingsPage
+              userProfile={userProfile}
+              setUserProfile={setUserProfile}
+              dailyGoal={dailyGoal}
+              setDailyGoal={setDailyGoal}
             />
           )}
         </div>
@@ -243,42 +274,28 @@ export default function App() {
         title="إضافة مادة دراسية جديدة"
         footer={
           <div className="flex justify-end gap-3">
-            <button
-              onClick={() => setIsAddModalOpen(false)}
-              className="px-5 py-2.5 rounded-xl text-sm font-semibold text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors"
-            >
-              إلغاء
-            </button>
-            <button
-              onClick={addNewSubject}
+            <button onClick={() => setIsAddModalOpen(false)}
+              className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors hover:opacity-80"
+              style={cancelBtnStyle}
+            >إلغاء</button>
+            <button onClick={addNewSubject}
               className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-violet-600 hover:bg-violet-500 shadow-sm shadow-violet-600/15 transition-all"
-            >
-              إضافة المادة
-            </button>
+            >إضافة المادة</button>
           </div>
         }
       >
         <div>
-          <label htmlFor="add-subject-name" className="block text-sm font-semibold text-zinc-300 mb-2">اسم المادة</label>
-          <input
-            id="add-subject-name"
-            type="text"
-            value={newSubjectData.name}
+          <label htmlFor="add-subject-name" className={labelCls} style={labelStyle}>اسم المادة</label>
+          <input id="add-subject-name" type="text" value={newSubjectData.name}
             onChange={(e) => setNewSubjectData({ ...newSubjectData, name: e.target.value })}
-            className="w-full bg-[#060b14] border border-white/10 rounded-xl px-4 py-3 text-white font-bold focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 outline-none transition-all placeholder:text-slate-600 shadow-inner shadow-black/20"
-            placeholder="مثال: الفيزياء"
-            style={{ '::placeholder': { color: '#52525b' } }}
+            className={inputCls} style={inputStyle} placeholder="مثال: الفيزياء"
           />
         </div>
         <div>
-          <label htmlFor="add-subject-hours" className="block text-sm font-semibold text-zinc-300 mb-2">الهدف الإجمالي (ساعات)</label>
-          <input
-            id="add-subject-hours"
-            type="number"
-            min="1"
-            value={newSubjectData.goalHours}
+          <label htmlFor="add-subject-hours" className={labelCls} style={labelStyle}>الهدف الإجمالي (ساعات)</label>
+          <input id="add-subject-hours" type="number" min="1" value={newSubjectData.goalHours}
             onChange={(e) => setNewSubjectData({ ...newSubjectData, goalHours: e.target.value })}
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-white font-medium focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/40 outline-none transition-all"
+            className={inputCls} style={inputStyle}
           />
         </div>
       </Modal>
@@ -290,30 +307,21 @@ export default function App() {
         title="تعديل الهدف اليومي"
         footer={
           <div className="flex justify-end gap-3">
-            <button
-              onClick={() => setIsGoalModalOpen(false)}
-              className="px-5 py-2.5 rounded-xl text-sm font-semibold text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors"
-            >
-              إلغاء
-            </button>
-            <button
-              onClick={() => { setDailyGoal(Math.max(1, parseInt(tempGoal) || 1)); setIsGoalModalOpen(false); }}
+            <button onClick={() => setIsGoalModalOpen(false)}
+              className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors hover:opacity-80"
+              style={cancelBtnStyle}
+            >إلغاء</button>
+            <button onClick={() => { setDailyGoal(Math.max(1, parseInt(tempGoal) || 1)); setIsGoalModalOpen(false); }}
               className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-violet-600 hover:bg-violet-500 shadow-sm shadow-violet-600/15 transition-all"
-            >
-              حفظ
-            </button>
+            >حفظ</button>
           </div>
         }
       >
         <div>
-          <label htmlFor="edit-daily-goal" className="block text-sm font-semibold text-zinc-300 mb-2">الهدف اليومي (ساعات)</label>
-          <input
-            id="edit-daily-goal"
-            type="number"
-            min="1"
-            value={tempGoal}
+          <label htmlFor="edit-daily-goal" className={labelCls} style={labelStyle}>الهدف اليومي (ساعات)</label>
+          <input id="edit-daily-goal" type="number" min="1" value={tempGoal}
             onChange={(e) => setTempGoal(e.target.value)}
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-white font-medium focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/40 outline-none transition-all"
+            className={inputCls} style={inputStyle}
           />
         </div>
       </Modal>
@@ -324,71 +332,61 @@ export default function App() {
         title={`إعدادات: ${editingSubject || ''}`}
         footer={
           <div className="flex justify-between gap-3">
-            <button
-              onClick={deleteSubject}
+            <button onClick={deleteSubject}
               className="px-4 py-2.5 rounded-xl text-sm font-semibold text-red-500 hover:bg-red-500/8 hover:text-red-400 transition-colors flex items-center gap-2"
-            >
-              <Icons.Trash /> حذف المادة
-            </button>
+            ><Icons.Trash /> حذف المادة</button>
             <div className="flex gap-3">
-              <button
-                onClick={() => setEditingSubject(null)}
-                className="px-5 py-2.5 rounded-xl text-sm font-bold text-slate-400 hover:bg-white/5 hover:text-white transition-colors"
-              >
-                إلغاء
-              </button>
-              <button
-                onClick={saveSubjectSettings}
+              <button onClick={() => setEditingSubject(null)}
+                className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors hover:opacity-80"
+                style={cancelBtnStyle}
+              >إلغاء</button>
+              <button onClick={saveSubjectSettings}
                 className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-violet-600 hover:bg-violet-500 shadow-sm shadow-violet-600/15 transition-all"
-              >
-                حفظ
-              </button>
+              >حفظ</button>
             </div>
           </div>
         }
       >
         <div>
-          <label htmlFor="edit-goal-hours" className="block text-sm font-bold text-slate-300 mb-2">الهدف الإجمالي (ساعات)</label>
-          <input
-            id="edit-goal-hours"
-            type="number"
-            min="1"
-            value={editFormData.goalHours}
+          <label htmlFor="edit-goal-hours" className={labelCls} style={labelStyle}>الهدف الإجمالي (ساعات)</label>
+          <input id="edit-goal-hours" type="number" min="1" value={editFormData.goalHours}
             onChange={(e) => setEditFormData({ ...editFormData, goalHours: e.target.value })}
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-white font-medium focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/40 outline-none transition-all"
+            className={inputCls} style={inputStyle}
           />
         </div>
         <div>
-          <label className="block text-sm font-bold text-slate-300 mb-2">ما تم إنجازه مسبقاً (إدخال يدوي)</label>
+          <label className={labelCls} style={labelStyle}>ما تم إنجازه مسبقاً (إدخال يدوي)</label>
           <div className="flex gap-4">
             <div className="flex-1 relative">
-              <input
-                id="edit-studied-h"
-                type="number"
-                min="0"
-                value={editFormData.studiedH}
+              <input id="edit-studied-h" type="number" min="0" value={editFormData.studiedH}
                 onChange={(e) => setEditFormData({ ...editFormData, studiedH: e.target.value })}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pr-4 pl-12 py-3 text-white font-medium focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/40 outline-none transition-all"
+                className={`${inputCls} pr-4 pl-12`} style={inputStyle}
                 aria-label="ساعات الدراسة المنجزة"
               />
-              <span className="absolute left-4 top-3 text-zinc-500 text-sm font-medium">ساعة</span>
+              <span className="absolute left-4 top-3 text-sm font-medium" style={{ color: 'var(--c-text-faint)' }}>ساعة</span>
             </div>
             <div className="flex-1 relative">
-              <input
-                id="edit-studied-m"
-                type="number"
-                min="0"
-                max="59"
-                value={editFormData.studiedM}
+              <input id="edit-studied-m" type="number" min="0" max="59" value={editFormData.studiedM}
                 onChange={(e) => setEditFormData({ ...editFormData, studiedM: e.target.value })}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pr-4 pl-12 py-3 text-white font-medium focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/40 outline-none transition-all"
+                className={`${inputCls} pr-4 pl-12`} style={inputStyle}
                 aria-label="دقائق الدراسة المنجزة"
               />
-              <span className="absolute left-4 top-3 text-zinc-500 text-sm font-medium">دقيقة</span>
+              <span className="absolute left-4 top-3 text-sm font-medium" style={{ color: 'var(--c-text-faint)' }}>دقيقة</span>
             </div>
           </div>
         </div>
       </Modal>
     </div>
+  );
+}
+
+// ==========================================
+// MAIN EXPORT — wraps with ThemeProvider
+// ==========================================
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppInner />
+    </ThemeProvider>
   );
 }

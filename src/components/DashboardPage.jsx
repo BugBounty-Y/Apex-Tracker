@@ -3,6 +3,7 @@ import SubjectCard from './SubjectCard';
 import { getRemainingDays } from '../utils/constants';
 import StudyTimeCard from './StudyTimeCard';
 import StreakCard from './StreakCard';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function DashboardPage({
   subjects,
@@ -16,8 +17,10 @@ export default function DashboardPage({
   dailyLog = {},
   streak = 0,
   onEditGoal,
+  userProfile,
 }) {
-  const remainingDays = getRemainingDays();
+  const { isDark } = useTheme();
+  const remainingDays = getRemainingDays(userProfile?.examDate);
   const totalSubjects = Object.keys(subjects).length;
   const totalGoalHours = Object.values(subjects).reduce((s, d) => s + d.goalHours, 0);
   const totalStudiedHours = Object.values(subjects).reduce((s, d) => s + d.studiedSeconds, 0) / 3600;
@@ -34,42 +37,50 @@ export default function DashboardPage({
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Hero Section */}
-      <div className="relative overflow-hidden bg-gradient-to-l from-[#09090b] via-[#0f0f14] to-[#13111c] rounded-2xl p-6 md:p-8 text-white border border-zinc-800/60">
+      <div className="relative overflow-hidden rounded-2xl p-6 md:p-8 border"
+        style={{
+          background: isDark
+            ? 'linear-gradient(to left, #09090b, #0f0f14, #13111c)'
+            : 'linear-gradient(to left, #f5f5f7, #f0f0f5, #ebe8f3)',
+          borderColor: 'var(--c-border)',
+        }}
+      >
         {/* Decorative glow */}
-        <div className="absolute top-0 left-0 w-72 h-72 bg-violet-600/[0.06] rounded-full blur-[120px] pointer-events-none" />
-        <div className="absolute bottom-0 right-10 w-52 h-52 bg-cyan-400/[0.03] rounded-full blur-[100px] pointer-events-none" />
-        
+        <div className="absolute top-0 left-0 w-72 h-72 rounded-full blur-[120px] pointer-events-none" style={{ backgroundColor: 'var(--c-glow-violet)' }} />
+        <div className="absolute bottom-0 right-10 w-52 h-52 rounded-full blur-[100px] pointer-events-none" style={{ backgroundColor: 'var(--c-glow-cyan)' }} />
+
         <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-3">
               <span className="text-xl">{motivation.emoji}</span>
-              <div className="px-3 py-1 bg-violet-500/10 rounded-full text-[11px] font-semibold text-violet-300 border border-violet-500/15">
+              <div className="px-3 py-1 bg-violet-500/10 rounded-full text-[11px] font-semibold text-violet-500 border border-violet-500/15">
                 هدفك: 99%
               </div>
             </div>
-            <h2 className="text-xl md:text-2xl font-bold mb-2 leading-tight text-white">
-              مرحباً يحيى، أهلاً بك في غرفة العمليات
+            <h2 className="text-xl md:text-2xl font-bold mb-2 leading-tight" style={{ color: 'var(--c-text)' }}>
+              مرحباً {userProfile?.name || 'يحيى'}، أهلاً بك في غرفة العمليات
             </h2>
-            <p className="text-sm text-zinc-500 font-medium leading-relaxed max-w-xl">
+            <p className="text-sm font-medium leading-relaxed max-w-xl" style={{ color: 'var(--c-text-muted)' }}>
               {motivation.text}
             </p>
           </div>
-          
+
           <div className="flex flex-wrap gap-3">
-            <div className="bg-zinc-900/80 backdrop-blur-sm rounded-xl p-4 border border-zinc-800/60 min-w-[120px]">
-              <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1">التقدم الكلي</div>
-              <div className="text-2xl font-bold tabular-nums text-white">{overallProgress.toFixed(1)}%</div>
-              <div className="w-full h-1 bg-zinc-800 rounded-full mt-2.5 overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-l from-violet-500 to-violet-400 rounded-full transition-all duration-1000"
-                  style={{ width: `${overallProgress}%` }}
-                />
+            <div className="backdrop-blur-sm rounded-xl p-4 border min-w-[120px]"
+              style={{ backgroundColor: 'var(--c-elevated)', borderColor: 'var(--c-border)' }}
+            >
+              <div className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--c-text-faint)' }}>التقدم الكلي</div>
+              <div className="text-2xl font-bold tabular-nums" style={{ color: 'var(--c-text)' }}>{overallProgress.toFixed(1)}%</div>
+              <div className="w-full h-1 rounded-full mt-2.5 overflow-hidden" style={{ backgroundColor: isDark ? '#27272a' : '#e4e4e7' }}>
+                <div className="h-full bg-gradient-to-l from-violet-500 to-violet-400 rounded-full transition-all duration-1000" style={{ width: `${overallProgress}%` }} />
               </div>
             </div>
-            <div className="bg-zinc-900/80 backdrop-blur-sm rounded-xl p-4 border border-zinc-800/60 min-w-[100px]">
-              <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1">متبقي</div>
-              <div className="text-2xl font-bold tabular-nums text-amber-400">{remainingDays}</div>
-              <div className="text-[11px] font-medium text-zinc-500 mt-0.5">يوم للامتحان</div>
+            <div className="backdrop-blur-sm rounded-xl p-4 border min-w-[100px]"
+              style={{ backgroundColor: 'var(--c-elevated)', borderColor: 'var(--c-border)' }}
+            >
+              <div className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--c-text-faint)' }}>متبقي</div>
+              <div className="text-2xl font-bold tabular-nums text-amber-500">{remainingDays}</div>
+              <div className="text-[11px] font-medium mt-0.5" style={{ color: 'var(--c-text-faint)' }}>يوم للامتحان</div>
             </div>
           </div>
         </div>
@@ -78,27 +89,20 @@ export default function DashboardPage({
       {/* Daily Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 lg:gap-5">
         <div className="md:col-span-7 xl:col-span-8">
-          <StudyTimeCard 
-            todayStudiedSeconds={todayStudiedSeconds} 
-            dailyGoalHours={dailyGoal} 
-            onEditGoal={onEditGoal} 
-          />
+          <StudyTimeCard todayStudiedSeconds={todayStudiedSeconds} dailyGoalHours={dailyGoal} onEditGoal={onEditGoal} />
         </div>
         <div className="md:col-span-5 xl:col-span-4">
-          <StreakCard 
-            dailyLog={dailyLog} 
-            streak={streak} 
-          />
+          <StreakCard dailyLog={dailyLog} streak={streak} />
         </div>
       </div>
 
       {/* Section Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 px-1">
         <div>
-          <h2 className="text-lg md:text-xl font-bold text-white tracking-tight flex items-center gap-2">
+          <h2 className="text-lg md:text-xl font-bold tracking-tight flex items-center gap-2" style={{ color: 'var(--c-text)' }}>
             <Icons.Book /> المقـررات الدراسـية
           </h2>
-          <p className="text-sm text-zinc-500 mt-1 font-medium">
+          <p className="text-sm mt-1 font-medium" style={{ color: 'var(--c-text-muted)' }}>
             اضغط على المادة للدخول إلى جلسة تركيز • إجمالي {totalSubjects} مادة
           </p>
         </div>
@@ -113,12 +117,16 @@ export default function DashboardPage({
 
       {/* Subject Grid */}
       {totalSubjects === 0 ? (
-        <div className="bg-zinc-900/50 rounded-2xl p-12 text-center border-2 border-dashed border-zinc-800">
-          <div className="w-20 h-20 bg-zinc-900 rounded-full flex items-center justify-center mx-auto mb-4 text-zinc-600">
+        <div className="rounded-2xl p-12 text-center border-2 border-dashed"
+          style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' }}
+        >
+          <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4"
+            style={{ backgroundColor: 'var(--c-surface-alt)', color: 'var(--c-text-faint)' }}
+          >
             <Icons.Plus />
           </div>
-          <h3 className="text-lg font-bold text-white mb-2">لا يوجد مقررات مسجلة</h3>
-          <p className="text-zinc-500 font-medium mb-6">قم بإضافة موادك الدراسية للبدء في تتبع الإنجاز.</p>
+          <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--c-text)' }}>لا يوجد مقررات مسجلة</h3>
+          <p className="font-medium mb-6" style={{ color: 'var(--c-text-muted)' }}>قم بإضافة موادك الدراسية للبدء في تتبع الإنجاز.</p>
           <button
             onClick={onAddSubject}
             className="px-6 py-3 bg-violet-600 text-white rounded-xl font-semibold hover:bg-violet-500 transition-colors shadow-lg shadow-violet-600/15"
@@ -137,6 +145,7 @@ export default function DashboardPage({
               isTimerRunning={isTimerRunning}
               onSubjectClick={onSubjectClick}
               onEdit={onEdit}
+              userProfile={userProfile}
             />
           ))}
         </div>

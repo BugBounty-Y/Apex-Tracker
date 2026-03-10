@@ -7,6 +7,56 @@
 }
 
 /* ==========================================
+   THEME TOKENS — Dark (default)
+   ========================================== */
+:root {
+  --c-bg: #09090b;
+  --c-surface: #111113;
+  --c-surface-alt: #18181b;
+  --c-surface-hover: #1c1c20;
+  --c-elevated: rgba(39, 39, 42, 0.5);
+  --c-border: rgba(39, 39, 42, 0.6);
+  --c-border-hover: #3f3f46;
+  --c-text: #e4e4e7;
+  --c-text-sub: #a1a1aa;
+  --c-text-muted: #71717a;
+  --c-text-faint: #52525b;
+  --c-input: #18181b;
+  --c-overlay: rgba(0, 0, 0, 0.6);
+  --c-selection: rgba(139, 92, 246, 0.3);
+  --c-glow-violet: rgba(139, 92, 246, 0.04);
+  --c-glow-cyan: rgba(34, 211, 238, 0.03);
+  --c-ring-active: rgba(139, 92, 246, 0.6);
+  --c-sidebar-active: rgba(139, 92, 246, 0.1);
+  --c-nav-active: #a78bfa; /* violet-400 */
+}
+
+/* ==========================================
+   THEME TOKENS — Light
+   ========================================== */
+.light {
+  --c-bg: #f5f5f7;
+  --c-surface: #ffffff;
+  --c-surface-alt: #f4f4f5;
+  --c-surface-hover: #ececee;
+  --c-elevated: rgba(0, 0, 0, 0.04);
+  --c-border: rgba(0, 0, 0, 0.08);
+  --c-border-hover: rgba(0, 0, 0, 0.15);
+  --c-text: #18181b;
+  --c-text-sub: #3f3f46;
+  --c-text-muted: #71717a;
+  --c-text-faint: #a1a1aa;
+  --c-input: #f4f4f5;
+  --c-overlay: rgba(0, 0, 0, 0.25);
+  --c-selection: rgba(139, 92, 246, 0.15);
+  --c-glow-violet: rgba(139, 92, 246, 0.06);
+  --c-glow-cyan: rgba(34, 211, 238, 0.04);
+  --c-ring-active: rgba(139, 92, 246, 0.5);
+  --c-sidebar-active: rgba(139, 92, 246, 0.08);
+  --c-nav-active: #7c3aed; /* violet-600 */
+}
+
+/* ==========================================
    ANIMATIONS
    ========================================== */
 @keyframes fade-in {
@@ -27,11 +77,6 @@
 @keyframes float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-6px); }
-}
-
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
 }
 
 .animate-fade-in {
@@ -77,4 +122,14 @@
    ========================================== */
 .tabular-nums {
   font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================
+   THEME TRANSITION
+   ========================================== */
+.theme-transition,
+.theme-transition *,
+.theme-transition *::before,
+.theme-transition *::after {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.2s ease, box-shadow 0.3s ease !important;
 }

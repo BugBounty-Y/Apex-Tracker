@@ -8,10 +8,11 @@ export const START_DATE = new Date('2026-03-10T00:00:00');
  * Calculates remaining days from today to exam date.
  * Falls back to at least 1 to avoid division by zero.
  */
-export function getRemainingDays() {
+export function getRemainingDays(examDateStr) {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
-  const diff = Math.ceil((EXAM_DATE - now) / (1000 * 60 * 60 * 24));
+  const examDate = new Date(examDateStr || '2026-06-06T00:00:00');
+  const diff = Math.ceil((examDate - now) / (1000 * 60 * 60 * 24));
   return Math.max(1, diff);
 }
 
