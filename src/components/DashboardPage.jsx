@@ -54,7 +54,7 @@ export default function DashboardPage({
             <div className="flex items-center gap-2 mb-3">
               <span className="text-xl">{motivation.emoji}</span>
               <div className="px-3 py-1 bg-violet-500/10 rounded-full text-[11px] font-semibold text-violet-500 border border-violet-500/15">
-                هدفك: 99%
+                التقدم: {overallProgress.toFixed(0)}%
               </div>
             </div>
             <h2 className="text-xl md:text-2xl font-bold mb-2 leading-tight" style={{ color: 'var(--c-text)' }}>

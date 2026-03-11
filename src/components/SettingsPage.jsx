@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { Icons } from './Icons';
 
@@ -17,6 +17,16 @@ export default function SettingsPage({
     timezone: userProfile?.timezone || 'auto',
     dailyGoal: dailyGoal || 3,
   });
+
+  // Sync local form state when props change externally
+  useEffect(() => {
+    setFormData({
+      name: userProfile?.name || 'يحيى',
+      examDate: userProfile?.examDate || '2026-06-06',
+      timezone: userProfile?.timezone || 'auto',
+      dailyGoal: dailyGoal || 3,
+    });
+  }, [userProfile, dailyGoal]);
 
   const [isSaved, setIsSaved] = useState(false);
 

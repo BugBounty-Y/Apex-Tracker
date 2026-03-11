@@ -18,51 +18,69 @@ export function formatHoursMins(sec) {
 }
 
 /**
+ * Parses a timezone string like 'UTC+3', 'UTC-5', 'UTC+5:30' into offset in minutes.
+ * Returns browser's local offset if timezone is 'auto' or invalid.
+ * Shared utility to avoid duplicating timezone parsing logic.
+ */
+export function parseTimezoneOffset(userTimezone = 'auto') {
+  if (!userTimezone || userTimezone === 'auto') {
+    return -new Date().getTimezoneOffset(); // Browser's local offset (e.g., UTC+3 = 180)
+  }
+  try {
+    const offsetStr = userTimezone.replace('UTC', '');
+    let offsetMinutes;
+    if (offsetStr === '+5:30') {
+      offsetMinutes = 5.5 * 60;
+    } else {
+      offsetMinutes = Number(offsetStr) * 60;
+    }
+    if (isNaN(offsetMinutes)) return -new Date().getTimezoneOffset();
+    return offsetMinutes;
+  } catch {
+    return -new Date().getTimezoneOffset();
+  }
+}
+
+/**
+ * Given a Date object and an offset in minutes, returns the YYYY-MM-DD string
+ * representing the date in that timezone.
+ */
+export function dateToLocalKey(d, offsetMinutes) {
+  const utcTime = d.getTime() + (d.getTimezoneOffset() * 60000);
+  return new Date(utcTime + (offsetMinutes * 60000)).toISOString().slice(0, 10);
+}
+
+/**
  * Returns today's date string in YYYY-MM-DD format for daily tracking.
  * Uses local timezone to prevent UTC midnight drifting.
  * If userProfile has a specific timezone (e.g., 'UTC+3'), it calculates based on that.
  */
 export function getTodayKey(userTimezone = 'auto') {
-  const d = new Date();
-  
-  // If set to auto, use browser's local timezone offset
-  if (!userTimezone || userTimezone === 'auto') {
-    return new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
-  }
-
-  // Parse custom timezone (e.g., 'UTC+3' -> 3, 'UTC-5' -> -5)
-  try {
-    const offsetStr = userTimezone.replace('UTC', '');
-    let offsetMinutes = 0;
-    
-    if (offsetStr === '+5:30') { // Special case for India
-      offsetMinutes = 5.5 * 60;
-    } else {
-      offsetMinutes = Number(offsetStr) * 60;
-    }
-
-    if (isNaN(offsetMinutes)) throw new Error('Invalid offset');
-
-    // Calculate time using UTC milliseconds + custom offset
-    const utcTime = d.getTime() + (d.getTimezoneOffset() * 60000); // Convert local to true UTC
-    const customTime = utcTime + (offsetMinutes * 60000); // Add custom offset
-    
-    return new Date(customTime).toISOString().slice(0, 10);
-  } catch (e) {
-    // Fallback to auto on any parsing error
-    return new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
-  }
+  const offsetMinutes = parseTimezoneOffset(userTimezone);
+  return dateToLocalKey(new Date(), offsetMinutes);
 }
 
 /**
  * Plays a notification sound using the Web Audio API.
+ * Reuses a single AudioContext to prevent memory leaks.
  * Falls back silently if audio is not available.
  */
+let _audioCtx = null;
 export function playNotificationSound() {
   try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return;
-    const ctx = new AudioContext();
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+
+    // Reuse existing AudioContext or create one
+    if (!_audioCtx || _audioCtx.state === 'closed') {
+      _audioCtx = new AudioContextClass();
+    }
+    // Resume if suspended (browser autoplay policy)
+    if (_audioCtx.state === 'suspended') {
+      _audioCtx.resume();
+    }
+
+    const ctx = _audioCtx;
     const notes = [523.25, 659.25, 783.99]; // C5, E5, G5
     notes.forEach((freq, i) => {
       const osc = ctx.createOscillator();

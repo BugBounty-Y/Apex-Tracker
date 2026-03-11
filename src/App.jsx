@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Icons } from './components/Icons';
 import Sidebar from './components/Sidebar';
 import DashboardPage from './components/DashboardPage';
@@ -17,32 +17,21 @@ import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 function AppInner() {
   const { theme, isDark } = useTheme();
 
-  // --- Data State (loaded from localStorage) ---
-  const [subjects, setSubjects] = useState(() => {
-    const saved = loadData();
-    return saved?.subjects || initialSubjects;
-  });
+  // --- Data State (loaded from localStorage ONCE) ---
+  const [savedData] = useState(() => loadData());
 
-  const [dailyLog, setDailyLog] = useState(() => {
-    const saved = loadData();
-    return saved?.dailyLog || {};
-  });
-
-  const [dailyGoal, setDailyGoal] = useState(() => {
-    const saved = loadData();
-    return saved?.dailyGoal || 3;
-  });
-
-  const [userProfile, setUserProfile] = useState(() => {
-    const saved = loadData();
-    return saved?.userProfile || { name: 'يحيى', examDate: '2026-06-06' };
-  });
+  const [subjects, setSubjects] = useState(() => savedData?.subjects || initialSubjects);
+  const [dailyLog, setDailyLog] = useState(() => savedData?.dailyLog || {});
+  const [dailyGoal, setDailyGoal] = useState(() => savedData?.dailyGoal || 3);
+  const [userProfile, setUserProfile] = useState(() =>
+    savedData?.userProfile || { name: 'يحيى', examDate: '2026-06-06' }
+  );
 
   const [activeSubject, setActiveSubject] = useState(null);
   const [currentView, setCurrentView] = useState('dashboard');
 
-  // --- Today tracking ---
-  const [todayKey, setTodayKey] = useState(getTodayKey());
+  // --- Today tracking (using user's timezone from the start) ---
+  const [todayKey, setTodayKey] = useState(() => getTodayKey(savedData?.userProfile?.timezone));
   const todayStudiedSeconds = dailyLog[todayKey] || 0;
 
   // --- Streak (computed from daily log) ---
@@ -55,6 +44,10 @@ function AppInner() {
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
   const [tempGoal, setTempGoal] = useState(dailyGoal);
   const [newSubjectData, setNewSubjectData] = useState({ name: '', goalHours: 50 });
+
+  // --- Ref for latest state (used in beforeunload) ---
+  const latestStateRef = useRef({ subjects, dailyLog, dailyGoal, userProfile });
+  latestStateRef.current = { subjects, dailyLog, dailyGoal, userProfile };
 
   // --- Timer callbacks ---
   const onTickFocus = useCallback((elapsed = 1) => {
@@ -92,13 +85,22 @@ function AppInner() {
   // --- Timer Hook ---
   const timer = useTimer({ activeSubject, onTickFocus, onSessionComplete });
 
-  // --- Persist to localStorage ---
+  // --- Persist to localStorage (debounced) ---
   useEffect(() => {
     const timeout = setTimeout(() => {
       saveData({ subjects, dailyLog, dailyGoal, userProfile });
-    }, 1000); // Debounce save to reduce IO blocking
+    }, 1000);
     return () => clearTimeout(timeout);
   }, [subjects, dailyLog, dailyGoal, userProfile]);
+
+  // --- Save immediately on tab close to prevent data loss ---
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      saveData(latestStateRef.current);
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
 
   // --- Day change detection ---
   useEffect(() => {
@@ -119,19 +121,9 @@ function AppInner() {
   // ==========================================
   // ACTIONS
   // ==========================================
-  const handleSubjectClick = (subj) => {
-    if (timer.isRunning && activeSubject && activeSubject !== subj) {
-      if (!window.confirm(`المؤقت يعمل حالياً على "${activeSubject}". هل تريد الانتقال إلى "${subj}"؟`)) {
-        return;
-      }
-      timer.resetTimer();
-    }
-    setActiveSubject(subj);
-    if (!timer.isRunning) timer.changeMode('focus');
-    setCurrentView('timer');
-  };
 
-  const handleSelectSubjectFromTimer = (subj) => {
+  // Shared handler for selecting a subject (from dashboard or timer)
+  const handleSelectSubject = useCallback((subj, navigateToTimer = false) => {
     if (timer.isRunning && activeSubject && activeSubject !== subj) {
       if (!window.confirm(`المؤقت يعمل حالياً على "${activeSubject}". هل تريد التبديل إلى "${subj}"؟`)) {
         return;
@@ -140,7 +132,11 @@ function AppInner() {
     }
     setActiveSubject(subj);
     if (!timer.isRunning) timer.changeMode('focus');
-  };
+    if (navigateToTimer) setCurrentView('timer');
+  }, [timer, activeSubject]);
+
+  const handleSubjectClick = (subj) => handleSelectSubject(subj, true);
+  const handleSelectSubjectFromTimer = (subj) => handleSelectSubject(subj, false);
 
   // --- CRUD ---
   const openEditModal = (subjName, e) => {

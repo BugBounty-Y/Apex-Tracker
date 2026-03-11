@@ -1,6 +1,8 @@
 // ==========================================
 // localStorage PERSISTENCE LAYER
 // ==========================================
+import { parseTimezoneOffset, dateToLocalKey } from './helpers';
+
 const STORAGE_KEY = 'apex-tracker-data';
 
 /**
@@ -29,42 +31,16 @@ export function saveData(data) {
 }
 
 /**
- * Calculates the streak (consecutive days with at least 1 minute of study).
+ * Calculates the streak (consecutive days with at least 25 minutes of study).
  * dailyLog is an object like { "2026-03-10": 120, "2026-03-09": 3600, ... }
  */
 export function calculateStreak(dailyLog, userTimezone = 'auto') {
   if (!dailyLog || Object.keys(dailyLog).length === 0) return 0;
 
-  // Determine timezone offset in minutes
-  let offsetMinutes = 0;
-  if (!userTimezone || userTimezone === 'auto') {
-    // Note: getTimezoneOffset() returns minutes, where UTC+3 is -180.
-    // For our math where we add the offset, we need the inverse.
-    offsetMinutes = -new Date().getTimezoneOffset();
-  } else {
-    try {
-      const offsetStr = userTimezone.replace('UTC', '');
-      if (offsetStr === '+5:30') offsetMinutes = 5.5 * 60;
-      else offsetMinutes = Number(offsetStr) * 60;
-      if (isNaN(offsetMinutes)) offsetMinutes = -new Date().getTimezoneOffset();
-    } catch {
-      offsetMinutes = -new Date().getTimezoneOffset();
-    }
-  }
+  const offsetMinutes = parseTimezoneOffset(userTimezone);
+  const getLocKey = (d) => dateToLocalKey(d, offsetMinutes);
 
-  // Define getLocKey globally for this function using the computed offset.
-  // We take the pure UTC time of the date object, and add the target offset.
-  const getLocKey = (d) => {
-    const utcTime = d.getTime() + (d.getTimezoneOffset() * 60000);
-    return new Date(utcTime + (offsetMinutes * 60000)).toISOString().slice(0, 10);
-  };
-
-  const pureNow = new Date();
   let streak = 0;
-  
-  // Set our "check date" to today, but aligned to the specific timezone.
-  // Actually, we can just use the pure current time, format it, then step back day by day.
-  // Since `setDate(getDate() - 1)` preserves time components and handles month/year wrapping reliably, we will use it.
   let checkDate = new Date();
 
   const todayKey = getLocKey(checkDate);

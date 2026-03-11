@@ -83,7 +83,7 @@ export default function SubjectCard({ name, data, isActive, isTimerRunning, onSu
         {/* Bottom row */}
         <div className="flex items-center justify-between pt-1">
           <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--c-text-muted)' }}>
-            <Icons.Wrench />
+            <Icons.Target />
             <span className="font-medium">يومياً:</span>
             <span className="font-semibold" style={{ color: 'var(--c-text-sub)' }}>
               {isCompleted ? '✅' : `${dReqH}h ${dReqM}m`}
