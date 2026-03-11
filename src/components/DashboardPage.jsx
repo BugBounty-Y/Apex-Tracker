@@ -3,6 +3,7 @@ import SubjectCard from './SubjectCard';
 import { getRemainingDays } from '../utils/constants';
 import StudyTimeCard from './StudyTimeCard';
 import StreakCard from './StreakCard';
+import DailyRequiredCard from './DailyRequiredCard';
 import { useTheme } from '../contexts/ThemeContext';
 
 export default function DashboardPage({
@@ -66,29 +67,85 @@ export default function DashboardPage({
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <div className="backdrop-blur-sm rounded-xl p-4 border min-w-[120px]"
-              style={{ backgroundColor: 'var(--c-elevated)', borderColor: 'var(--c-border)' }}
-            >
-              <div className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--c-text-faint)' }}>التقدم الكلي</div>
-              <div className="text-2xl font-bold tabular-nums" style={{ color: 'var(--c-text)' }}>{overallProgress.toFixed(1)}%</div>
-              <div className="w-full h-1 rounded-full mt-2.5 overflow-hidden" style={{ backgroundColor: isDark ? '#27272a' : '#e4e4e7' }}>
-                <div className="h-full bg-gradient-to-l from-violet-500 to-violet-400 rounded-full transition-all duration-1000" style={{ width: `${overallProgress}%` }} />
-              </div>
-            </div>
-            <div className="backdrop-blur-md rounded-2xl p-4 lg:p-5 border relative overflow-hidden flex flex-col items-center justify-center min-w-[140px] shadow-lg group"
+            {/* Overall Progress Card */}
+            <div className="relative rounded-2xl p-5 border min-w-[140px] overflow-hidden group cursor-default transition-all duration-300 hover:scale-[1.02]"
               style={{
-                backgroundColor: isDark ? 'rgba(245, 158, 11, 0.08)' : 'rgba(245, 158, 11, 0.1)',
-                borderColor: isDark ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.3)',
-                boxShadow: isDark ? '0 10px 30px -10px rgba(245,158,11,0.15)' : '0 10px 30px -10px rgba(245,158,11,0.2)'
+                backgroundColor: isDark ? 'rgba(139,92,246,0.06)' : 'rgba(139,92,246,0.08)',
+                borderColor: isDark ? 'rgba(139,92,246,0.2)' : 'rgba(139,92,246,0.25)',
+                boxShadow: isDark
+                  ? '0 8px 32px -8px rgba(139,92,246,0.2), inset 0 1px 0 rgba(139,92,246,0.1)'
+                  : '0 8px 32px -8px rgba(139,92,246,0.15), inset 0 1px 0 rgba(139,92,246,0.1)',
               }}
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-transparent pointer-events-none" />
-              <div className="relative z-10 flex items-center justify-center gap-1.5 mb-1.5 text-amber-500">
-                <span className="scale-[0.85]"><Icons.Target /></span>
-                <div className="text-[10px] font-bold uppercase tracking-widest text-amber-600" style={{ color: isDark ? '#fbbf24' : '#d97706' }}>موعد الامتحان</div>
+              <div className="absolute inset-0 bg-gradient-to-br from-violet-500/10 via-transparent to-fuchsia-500/5 pointer-events-none" />
+              <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full blur-[40px] pointer-events-none"
+                style={{ backgroundColor: isDark ? 'rgba(139,92,246,0.15)' : 'rgba(139,92,246,0.12)' }}
+              />
+              <div className="relative z-10 text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: isDark ? '#a78bfa' : '#7c3aed' }}>التقدم الكلي</div>
+              <div className="relative z-10 flex items-center gap-3">
+                {/* Mini ring */}
+                <div className="relative shrink-0">
+                  <svg width="52" height="52" viewBox="0 0 52 52" className="transform -rotate-90">
+                    <circle cx="26" cy="26" r="20" fill="none" stroke={isDark ? '#27272a' : '#e4e4e7'} strokeWidth="4" />
+                    <circle cx="26" cy="26" r="20" fill="none" stroke="url(#progGrad)" strokeWidth="4" strokeLinecap="round"
+                      strokeDasharray={2 * Math.PI * 20}
+                      strokeDashoffset={Math.max(0, 2 * Math.PI * 20 - (overallProgress / 100) * 2 * Math.PI * 20)}
+                      className="transition-all duration-1000 ease-out"
+                    />
+                    <defs>
+                      <linearGradient id="progGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#a78bfa" />
+                        <stop offset="100%" stopColor="#c084fc" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-[11px] font-bold tabular-nums" style={{ color: isDark ? '#c4b5fd' : '#7c3aed' }}>{Math.round(overallProgress)}%</span>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-2xl font-black tabular-nums tracking-tight leading-none" style={{ color: 'var(--c-text)' }}>{overallProgress.toFixed(1)}%</div>
+                  <div className="w-full h-1.5 rounded-full mt-2 overflow-hidden" style={{ backgroundColor: isDark ? '#27272a' : '#e4e4e7', minWidth: '70px' }}>
+                    <div className="h-full rounded-full transition-all duration-1000 ease-out"
+                      style={{ width: `${overallProgress}%`, background: 'linear-gradient(90deg, #8b5cf6, #c084fc, #a78bfa)' }}
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="relative z-10 text-3xl lg:text-4xl font-black tabular-nums tracking-tighter text-amber-500 drop-shadow-sm">{remainingDays}</div>
-              <div className="relative z-10 text-[11px] font-bold mt-1" style={{ color: isDark ? 'rgba(251,191,36,0.7)' : '#d97706' }}>يوم متبقي</div>
+            </div>
+
+            {/* Exam Countdown Card */}
+            <div className="relative rounded-2xl p-5 lg:p-6 border overflow-hidden flex flex-col items-center justify-center min-w-[140px] cursor-default group transition-all duration-300 hover:scale-[1.02]"
+              style={{
+                background: isDark
+                  ? 'linear-gradient(145deg, rgba(245,158,11,0.08), rgba(249,115,22,0.04))'
+                  : 'linear-gradient(145deg, rgba(245,158,11,0.1), rgba(249,115,22,0.05))',
+                borderColor: isDark ? 'rgba(245,158,11,0.25)' : 'rgba(245,158,11,0.35)',
+                boxShadow: isDark
+                  ? '0 8px 32px -8px rgba(245,158,11,0.2), inset 0 1px 0 rgba(245,158,11,0.1)'
+                  : '0 8px 32px -8px rgba(245,158,11,0.18), inset 0 1px 0 rgba(245,158,11,0.15)',
+              }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 via-transparent to-orange-500/5 pointer-events-none" />
+              <div className="absolute -bottom-6 -left-6 w-20 h-20 rounded-full blur-[35px] pointer-events-none"
+                style={{ backgroundColor: isDark ? 'rgba(245,158,11,0.15)' : 'rgba(245,158,11,0.12)' }}
+              />
+              <div className="relative z-10 flex items-center justify-center gap-1.5 mb-2">
+                <span className="text-amber-500 scale-[0.85]"><Icons.Target /></span>
+                <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: isDark ? '#fbbf24' : '#d97706' }}>موعد الامتحان</div>
+              </div>
+              <div className="relative z-10 text-4xl lg:text-5xl font-black tabular-nums tracking-tighter leading-none"
+                style={{ color: isDark ? '#fbbf24' : '#d97706', textShadow: isDark ? '0 0 24px rgba(251,191,36,0.25)' : 'none' }}
+              >
+                {remainingDays}
+              </div>
+              <div className="relative z-10 text-[11px] font-bold mt-1.5 tracking-wide" style={{ color: isDark ? 'rgba(251,191,36,0.7)' : '#b45309' }}>يوم متبقي</div>
+              {/* Urgency indicator */}
+              {remainingDays <= 30 && (
+                <div className="relative z-10 mt-2.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-red-500/10 text-red-500 border border-red-500/20">
+                  ⚡ وقت حاسم
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -96,13 +153,17 @@ export default function DashboardPage({
 
       {/* Daily Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 lg:gap-5">
-        <div className="md:col-span-7 xl:col-span-8">
+        <div className="md:col-span-5 xl:col-span-5">
           <StudyTimeCard todayStudiedSeconds={todayStudiedSeconds} dailyGoalHours={dailyGoal} onEditGoal={onEditGoal} />
         </div>
-        <div className="md:col-span-5 xl:col-span-4">
+        <div className="md:col-span-4 xl:col-span-4">
+          <DailyRequiredCard subjects={subjects} userProfile={userProfile} />
+        </div>
+        <div className="md:col-span-3 xl:col-span-3">
           <StreakCard dailyLog={dailyLog} streak={streak} userProfile={userProfile} />
         </div>
       </div>
+
 
       {/* Section Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 px-1">

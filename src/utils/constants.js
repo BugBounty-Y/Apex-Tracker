@@ -1,8 +1,6 @@
 // ==========================================
 // CONSTANTS & SYSTEM DATA
 // ==========================================
-export const EXAM_DATE = new Date('2026-06-06T00:00:00');
-export const START_DATE = new Date('2026-03-10T00:00:00');
 
 /**
  * Calculates remaining days from today to exam date.
@@ -16,12 +14,7 @@ export function getRemainingDays(examDateStr) {
   return Math.max(1, diff);
 }
 
-/**
- * Returns the total plan days (from start to exam).
- */
-export function getTotalPlanDays() {
-  return Math.ceil((EXAM_DATE - START_DATE) / (1000 * 60 * 60 * 24));
-}
+
 
 // Complete color theme map — avoids dynamic Tailwind class construction
 export const COLOR_THEMES = {

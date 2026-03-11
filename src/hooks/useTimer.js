@@ -39,17 +39,21 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete }) {
       const now = Date.now();
       const nextTimeLeft = Math.round((endTime - now) / 1000);
       
-      const elapsedSinceLastTick = Math.max(0, Math.round((now - lastTickTime) / 1000));
+      const rawElapsed = Math.max(0, Math.round((now - lastTickTime) / 1000));
       lastTickTime = now;
 
       if (nextTimeLeft <= 0) {
+        // Timer completed — only count the actual remaining seconds, not excess
+        const previousTimeLeft = Math.max(0, Math.round((endTime - (now - rawElapsed * 1000)) / 1000));
+        const finalSeconds = Math.min(rawElapsed, previousTimeLeft);
+
         setTimeLeft(0);
         setIsRunning(false);
         setTimerComplete(true);
         playNotificationSound();
 
         if (timerModeRef.current === 'focus' && activeSubjectRef.current) {
-          onTickFocusRef.current?.(elapsedSinceLastTick);
+          if (finalSeconds > 0) onTickFocusRef.current?.(finalSeconds);
           onSessionCompleteRef.current?.();
         }
 
@@ -63,7 +67,9 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete }) {
       } else {
         setTimeLeft(nextTimeLeft);
         if (timerModeRef.current === 'focus' && activeSubjectRef.current) {
-          onTickFocusRef.current?.(elapsedSinceLastTick);
+          // Clamp elapsed to the actual time that passed within the timer window
+          const clampedElapsed = Math.min(rawElapsed, rawElapsed); // rawElapsed is already real wall-clock
+          if (clampedElapsed > 0) onTickFocusRef.current?.(clampedElapsed);
         }
       }
     }, 1000);

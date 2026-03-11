@@ -146,7 +146,9 @@ export default function Sidebar({
             <div className="flex-1">
               <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--c-text-faint)' }}>الاستمرارية</div>
               <div className="text-base font-bold tabular-nums" style={{ color: 'var(--c-text)' }}>
-                {streak} <span className="text-xs font-medium" style={{ color: 'var(--c-text-faint)' }}>{streak === 1 ? 'يوم' : 'أيام'}</span>
+                {streak} <span className="text-xs font-medium" style={{ color: 'var(--c-text-faint)' }}>
+                  {streak === 1 ? 'يوم' : streak === 2 ? 'يومان' : streak >= 3 && streak <= 10 ? 'أيام' : 'يوماً'}
+                </span>
               </div>
             </div>
             {streak >= 3 && <span className="text-lg">🔥</span>}

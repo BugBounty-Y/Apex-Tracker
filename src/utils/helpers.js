@@ -29,8 +29,13 @@ export function parseTimezoneOffset(userTimezone = 'auto') {
   try {
     const offsetStr = userTimezone.replace('UTC', '');
     let offsetMinutes;
-    if (offsetStr === '+5:30') {
-      offsetMinutes = 5.5 * 60;
+    if (offsetStr.includes(':')) {
+      const [h, m] = offsetStr.split(':');
+      const hours = Number(h);
+      const mins = Number(m);
+      offsetMinutes = hours >= 0
+        ? (hours * 60) + mins
+        : (hours * 60) - mins;
     } else {
       offsetMinutes = Number(offsetStr) * 60;
     }

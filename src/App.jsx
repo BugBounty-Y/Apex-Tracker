@@ -34,6 +34,11 @@ function AppInner() {
   const [todayKey, setTodayKey] = useState(() => getTodayKey(savedData?.userProfile?.timezone));
   const todayStudiedSeconds = dailyLog[todayKey] || 0;
 
+  // --- Dynamic page title ---
+  useEffect(() => {
+    document.title = `Apex Tracker — غرفة عمليات ${userProfile?.name || 'الطالب'}`;
+  }, [userProfile?.name]);
+
   // --- Streak (computed from daily log) ---
   const streak = useMemo(() => calculateStreak(dailyLog, userProfile?.timezone), [dailyLog, userProfile?.timezone]);
 
@@ -50,6 +55,10 @@ function AppInner() {
   latestStateRef.current = { subjects, dailyLog, dailyGoal, userProfile };
 
   // --- Timer callbacks ---
+  // Ref for todayKey to avoid stale closure in onTickFocus
+  const todayKeyRef = useRef(todayKey);
+  todayKeyRef.current = todayKey;
+
   const onTickFocus = useCallback((elapsed = 1) => {
     if (!elapsed || elapsed <= 0 || !activeSubject) return;
     setSubjects(prev => {
@@ -63,10 +72,10 @@ function AppInner() {
       };
     });
     setDailyLog(prev => {
-      const key = getTodayKey(userProfile?.timezone);
+      const key = todayKeyRef.current;
       return { ...prev, [key]: (prev[key] || 0) + elapsed };
     });
-  }, [activeSubject, userProfile?.timezone]);
+  }, [activeSubject]);
 
   const onSessionComplete = useCallback(() => {
     if (!activeSubject) return;
@@ -130,8 +139,10 @@ function AppInner() {
       }
       timer.resetTimer();
     }
+    // Only reset timer mode if changing to a different subject while not running
+    const isNewSubject = activeSubject !== subj;
     setActiveSubject(subj);
-    if (!timer.isRunning) timer.changeMode('focus');
+    if (!timer.isRunning && isNewSubject) timer.changeMode('focus');
     if (navigateToTimer) setCurrentView('timer');
   }, [timer, activeSubject]);
 
@@ -152,9 +163,9 @@ function AppInner() {
   };
 
   const saveSubjectSettings = () => {
-    const totalStudiedSeconds =
-      (parseInt(editFormData.studiedH) || 0) * 3600 +
-      (parseInt(editFormData.studiedM) || 0) * 60;
+    const hours = Math.max(0, parseInt(editFormData.studiedH) || 0);
+    const minutes = Math.max(0, Math.min(59, parseInt(editFormData.studiedM) || 0));
+    const totalStudiedSeconds = hours * 3600 + minutes * 60;
     setSubjects(prev => ({
       ...prev,
       [editingSubject]: {

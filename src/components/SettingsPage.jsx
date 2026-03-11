@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { Icons } from './Icons';
+import { parseTimezoneOffset } from '../utils/helpers';
 
 export default function SettingsPage({
   userProfile,
@@ -118,7 +119,7 @@ export default function SettingsPage({
                 required
               />
               <p className="text-xs mt-2" style={{ color: 'var(--c-text-faint)' }}>
-                يستخدم لنظام العد التنازلي في الشريط الجانبي ولوحة التحكم.
+                يستخدم لنظام العد التنازلي وحساب الاستمرارية وأيام المذاكرة المتبقية.
               </p>
             </div>
 
@@ -149,6 +150,21 @@ export default function SettingsPage({
               <p className="text-xs mt-2" style={{ color: 'var(--c-text-faint)' }}>
                 لتحديد موعد بدء واستئناف يومك الدراسي، يؤثر على الاستمرارية.
               </p>
+              {(() => {
+                const offsetMins = parseTimezoneOffset(userProfile?.timezone);
+                const sign = offsetMins >= 0 ? '+' : '-';
+                const absH = Math.floor(Math.abs(offsetMins) / 60);
+                const absM = Math.abs(offsetMins) % 60;
+                const label = `UTC${sign}${absH}${absM ? ':' + String(absM).padStart(2, '0') : ''}`;
+                return (
+                  <div className="mt-2.5 flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium"
+                    style={{ backgroundColor: 'var(--c-elevated)', color: 'var(--c-text-sub)' }}
+                  >
+                    <Icons.Timer />
+                    <span>المنطقة الزمنية المستخدمة حالياً: <strong className="font-bold" style={{ color: 'var(--c-text)' }}>{label}</strong></span>
+                  </div>
+                );
+              })()}
             </div>
           </div>
 

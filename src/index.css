@@ -1,5 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap');
+
 @import "tailwindcss";
 
 @theme {
@@ -96,16 +95,29 @@
 }
 
 /* ==========================================
-   SCROLLBAR — hidden
+   SCROLLBAR — subtle and styled
    ========================================== */
 ::-webkit-scrollbar {
-  display: none;
-  width: 0;
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--c-border);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--c-text-faint);
 }
 
 * {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-border) transparent;
 }
 
 /* ==========================================
