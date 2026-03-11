@@ -12,11 +12,11 @@ export default function Sidebar({
   isTimerRunning,
   activeSubject,
   userProfile,
-  user,
-  onLogout,
 }) {
   const { isDark, toggleTheme } = useTheme();
   const remainingDays = getRemainingDays(userProfile?.examDate);
+  const studentName = userProfile?.name || 'طالب';
+  const studentInitial = studentName.charAt(0) || 'ط';
 
   const navItems = [
     { id: 'dashboard', label: 'لوحة التحكم', icon: <Icons.Home />, desc: 'نظرة عامة' },
@@ -35,18 +35,22 @@ export default function Sidebar({
           style={{ backgroundColor: 'var(--c-glow-violet)' }}
         />
 
-        {/* Logo + Theme Toggle */}
+        {/* Student Profile + Theme Toggle */}
         <div className="p-6 pb-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3.5">
-              <div className="w-11 h-11 bg-gradient-to-br from-violet-600 to-violet-500 rounded-2xl flex items-center justify-center shadow-lg shadow-violet-600/20">
-                <span className="text-white font-black text-base">A</span>
+            <button
+              onClick={() => onNavigate('settings')}
+              className="flex items-center gap-3.5 group transition-all hover:opacity-80"
+              title="الإعدادات"
+            >
+              <div className="w-11 h-11 bg-gradient-to-br from-violet-600 to-violet-500 rounded-2xl flex items-center justify-center shadow-lg shadow-violet-600/20 transition-transform group-hover:scale-105">
+                <span className="text-white font-black text-base">{studentInitial}</span>
               </div>
               <div>
-                <h1 className="text-[15px] font-bold tracking-tight" style={{ color: 'var(--c-text)' }}>Apex Tracker</h1>
-                <p className="text-[11px] font-medium mt-0.5" style={{ color: 'var(--c-text-faint)' }}>غرفة عمليات {userProfile?.name || 'يحيى'}</p>
+                <h1 className="text-[15px] font-bold tracking-tight" style={{ color: 'var(--c-text)' }}>{studentName}</h1>
+                <p className="text-[11px] font-medium mt-0.5" style={{ color: 'var(--c-text-faint)' }}>Apex Tracker</p>
               </div>
-            </div>
+            </button>
             {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
@@ -139,7 +143,7 @@ export default function Sidebar({
           </div>
         )}
 
-        {/* Bottom Stats + User */}
+        {/* Bottom Stats */}
         <div className="p-3 border-t space-y-2 mt-auto" style={{ borderColor: 'var(--c-border)' }}>
           <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ backgroundColor: 'var(--c-elevated)' }}>
             <div className="p-2 bg-orange-500/10 rounded-xl text-orange-400">
@@ -168,30 +172,6 @@ export default function Sidebar({
             </div>
             {todayStudiedSeconds >= 3600 && <span className="text-lg">⚡</span>}
           </div>
-
-          {/* User info + Logout */}
-          {user && (
-            <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ backgroundColor: 'var(--c-elevated)' }}>
-              <div className="p-2 bg-zinc-500/10 rounded-xl" style={{ color: 'var(--c-text-muted)' }}>
-                <Icons.User />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--c-text-faint)' }}>الحساب</div>
-                <div className="text-xs font-medium truncate" dir="ltr" style={{ color: 'var(--c-text-sub)' }}>
-                  {user.email || 'Google'}
-                </div>
-              </div>
-              <button
-                onClick={onLogout}
-                className="p-2 rounded-xl transition-all hover:bg-red-500/10 hover:text-red-400"
-                style={{ color: 'var(--c-text-faint)' }}
-                aria-label="تسجيل الخروج"
-                title="تسجيل الخروج"
-              >
-                <Icons.LogOut />
-              </button>
-            </div>
-          )}
         </div>
       </aside>
 
@@ -200,10 +180,12 @@ export default function Sidebar({
         style={{ backgroundColor: isDark ? 'rgba(9,9,11,0.95)' : 'rgba(245,245,247,0.95)', borderColor: 'var(--c-border)' }}
       >
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-gradient-to-br from-violet-600 to-violet-500 rounded-xl flex items-center justify-center shadow-lg shadow-violet-600/20">
-            <span className="text-white font-black text-sm">A</span>
-          </div>
-          <div className="text-sm font-bold" style={{ color: 'var(--c-text)' }}>Apex Tracker</div>
+          <button onClick={() => onNavigate('settings')} className="flex items-center gap-3 group">
+            <div className="w-9 h-9 bg-gradient-to-br from-violet-600 to-violet-500 rounded-xl flex items-center justify-center shadow-lg shadow-violet-600/20">
+              <span className="text-white font-black text-sm">{studentInitial}</span>
+            </div>
+            <div className="text-sm font-bold" style={{ color: 'var(--c-text)' }}>{studentName}</div>
+          </button>
         </div>
         <div className="flex items-center gap-2">
           <button

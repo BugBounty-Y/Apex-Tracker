@@ -10,13 +10,15 @@ export default function SettingsPage({
   dailyGoal,
   setDailyGoal,
   user,
+  onLogout,
+  onDeleteAccount,
 }) {
   const { isDark } = useTheme();
 
   // Local state for the form so we don't update parent on every keystroke
   const [formData, setFormData] = useState({
-    name: userProfile?.name || 'يحيى',
-    examDate: userProfile?.examDate || '2026-06-06',
+    name: userProfile?.name || '',
+    examDate: userProfile?.examDate || '',
     timezone: userProfile?.timezone || 'auto',
     dailyGoal: dailyGoal || 3,
   });
@@ -24,8 +26,8 @@ export default function SettingsPage({
   // Sync local form state when props change externally
   useEffect(() => {
     setFormData({
-      name: userProfile?.name || 'يحيى',
-      examDate: userProfile?.examDate || '2026-06-06',
+      name: userProfile?.name || '',
+      examDate: userProfile?.examDate || '',
       timezone: userProfile?.timezone || 'auto',
       dailyGoal: dailyGoal || 3,
     });
@@ -37,7 +39,7 @@ export default function SettingsPage({
     e.preventDefault();
     setUserProfile({
       name: formData.name.trim() || 'طالب',
-      examDate: formData.examDate || '2026-06-06',
+      examDate: formData.examDate,
       timezone: formData.timezone || 'auto',
     });
     setDailyGoal(Math.max(1, parseInt(formData.dailyGoal) || 1));
@@ -52,6 +54,24 @@ export default function SettingsPage({
         localStorage.removeItem('apex-tracker-data');
         if (user?.uid) await clearUserData(user.uid);
         window.location.reload();
+      }
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (window.confirm('الإجراء خطير جداً: هل أنت متأكد من أنك تريد حذف حسابك نهائياً بجميع بياناته؟ لا يمكن استعادة الحساب بعد الحذف.')) {
+      if (window.confirm('تأكيد أخير: سيتم مسح حسابك، وبياناتك، ولا يمكنك التراجع. هل تريد الاستمرار بالفعل؟')) {
+        // Clear data from Firestore first so we don't leave orphaned document
+        if (user?.uid) await clearUserData(user.uid);
+        
+        // Remove locally cached data
+        localStorage.removeItem('apex-tracker-data');
+        
+        // Delete the Firebase Auth User
+        const result = await onDeleteAccount();
+        if (!result.success) {
+          alert('تعذر حذف الحساب: ' + result.error);
+        }
       }
     }
   };
@@ -75,18 +95,29 @@ export default function SettingsPage({
 
       {/* Account info */}
       {user && (
-        <div className="rounded-2xl border p-4 relative z-10 flex items-center gap-3"
+        <div className="rounded-2xl border p-4 relative z-10 flex items-center justify-between gap-3"
           style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' }}
         >
-          <div className="p-2.5 bg-zinc-500/10 rounded-xl" style={{ color: 'var(--c-text-muted)' }}>
-            <Icons.User />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--c-text-faint)' }}>الحساب المسجّل</div>
-            <div className="text-sm font-medium truncate" dir="ltr" style={{ color: 'var(--c-text)' }}>
-              {user.email || 'Google Account'}
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-zinc-500/10 rounded-xl" style={{ color: 'var(--c-text-muted)' }}>
+              <Icons.User />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--c-text-faint)' }}>الحساب المسجّل</div>
+              <div className="text-sm font-medium truncate" dir="ltr" style={{ color: 'var(--c-text)' }}>
+                {user.email || 'Google Account'}
+              </div>
             </div>
           </div>
+          <button
+            type="button"
+            onClick={onLogout}
+            className="px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all hover:bg-red-500/10 hover:text-red-400"
+            style={{ color: 'var(--c-text-faint)' }}
+          >
+            <Icons.LogOut /> 
+            <span className="hidden sm:inline">تسجيل الخروج</span>
+          </button>
         </div>
       )}
 
@@ -216,12 +247,21 @@ export default function SettingsPage({
           هذه الإجراءات لا يمكن التراجع عنها. يرجى توخي الحذر عند استخدامها.
         </p>
 
-        <button
-          onClick={handleClearData}
-          className="px-6 py-3 rounded-xl text-sm font-semibold text-red-500 bg-red-500/10 hover:bg-red-500/20 ring-1 ring-red-500/20 transition-all flex items-center gap-2"
-        >
-          <Icons.Trash /> مسح جميع بيانات التطبيق
-        </button>
+        <div className="flex flex-col sm:flex-row gap-3 mt-5">
+          <button
+            onClick={handleClearData}
+            className="px-6 py-3 rounded-xl text-sm font-semibold text-red-500 bg-red-500/10 hover:bg-red-500/20 ring-1 ring-red-500/20 transition-all flex items-center justify-center gap-2"
+          >
+            <Icons.RotateCcw /> مسح جميع البيانات فقط
+          </button>
+          
+          <button
+            onClick={handleDeleteAccount}
+            className="px-6 py-3 rounded-xl text-sm font-semibold text-white bg-red-600 hover:bg-red-500 shadow-sm shadow-red-600/15 transition-all active:scale-95 flex items-center justify-center gap-2"
+          >
+            <Icons.Trash /> حذف الحساب نهائياً
+          </button>
+        </div>
       </div>
     </div>
   );

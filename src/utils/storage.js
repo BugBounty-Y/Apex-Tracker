@@ -96,9 +96,9 @@ export async function clearUserData(uid) {
 }
 
 /**
- * Migrate existing localStorage data to Firestore for first-time login.
- * Only migrates if Firestore has no data and localStorage has data.
- * Returns the data that should be used (Firestore > localStorage > null).
+ * Load user data from Firestore and enforce it onto localStorage.
+ * Firestore is the primary source of truth.
+ * Returns the data from Firestore, or null if no data exists.
  */
 export async function loadOrMigrateUserData(uid) {
   if (!uid) return null;
@@ -106,20 +106,14 @@ export async function loadOrMigrateUserData(uid) {
   // 1. Try loading from Firestore first
   const firestoreData = await loadUserData(uid);
   if (firestoreData) {
-    // Cloud data exists — use it and update local cache
+    // Cloud data exists — force it onto local cache
     saveData(firestoreData);
     return firestoreData;
   }
 
-  // 2. Firestore is empty — check if we have local data to migrate
-  const localData = loadData();
-  if (localData && localData.subjects) {
-    // Migrate local data to Firestore
-    await saveUserData(uid, localData);
-    return localData;
-  }
-
-  // 3. No data anywhere — new user
+  // 2. Firestore is empty — new user (do NOT migrate from localStorage)
+  // Clear any old local data so we don't accidentally load it later
+  localStorage.removeItem(STORAGE_KEY);
   return null;
 }
 

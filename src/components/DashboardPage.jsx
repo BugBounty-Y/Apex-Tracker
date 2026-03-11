@@ -59,7 +59,7 @@ export default function DashboardPage({
               </div>
             </div>
             <h2 className="text-xl md:text-2xl font-bold mb-2 leading-tight" style={{ color: 'var(--c-text)' }}>
-              مرحباً {userProfile?.name || 'يحيى'}، أهلاً بك في غرفة العمليات
+              مرحباً {userProfile?.name || 'طالب'}، أهلاً بك في غرفة العمليات
             </h2>
             <p className="text-sm font-medium leading-relaxed max-w-xl" style={{ color: 'var(--c-text-muted)' }}>
               {motivation.text}

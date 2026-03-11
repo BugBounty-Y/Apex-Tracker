@@ -7,9 +7,10 @@
  * Falls back to at least 1 to avoid division by zero.
  */
 export function getRemainingDays(examDateStr) {
+  if (!examDateStr) return 0;
   const now = new Date();
   now.setHours(0, 0, 0, 0);
-  const examDate = new Date(examDateStr || '2026-06-06T00:00:00');
+  const examDate = new Date(examDateStr);
   const diff = Math.ceil((examDate - now) / (1000 * 60 * 60 * 24));
   return Math.max(0, diff);
 }
@@ -239,23 +240,5 @@ export function colorStringForKey(key) {
   return t ? `${t.light} ${t.text}` : 'bg-slate-50 text-slate-900';
 }
 
-// Default subjects
-export const initialSubjects = {
-  'الكيمياء': { goalHours: 120, studiedSeconds: 0, sessions: 0, color: 'bg-blue-50 text-blue-800' },
-  'الفيزياء': { goalHours: 150, studiedSeconds: 0, sessions: 0, color: 'bg-indigo-50 text-indigo-800' },
-  'الرياضيات (التفاضل والتكامل)': { goalHours: 100, studiedSeconds: 0, sessions: 0, color: 'bg-indigo-50 text-indigo-800' },
-  'الرياضيات (الجبر والهندسة)': { goalHours: 90, studiedSeconds: 0, sessions: 0, color: 'bg-indigo-50 text-indigo-800' },
-  'الرياضيات (الميكانيكا)': { goalHours: 100, studiedSeconds: 0, sessions: 0, color: 'bg-indigo-50 text-indigo-800' },
-  'الأحياء': { goalHours: 110, studiedSeconds: 0, sessions: 0, color: 'bg-green-50 text-green-800' },
-  'اللغة الإنجليزية': { goalHours: 80, studiedSeconds: 0, sessions: 0, color: 'bg-yellow-50 text-yellow-800' },
-  'الفقه': { goalHours: 60, studiedSeconds: 0, sessions: 0, color: 'bg-amber-50 text-amber-800' },
-  'الحديث': { goalHours: 50, studiedSeconds: 0, sessions: 0, color: 'bg-amber-50 text-amber-800' },
-  'التفسير': { goalHours: 50, studiedSeconds: 0, sessions: 0, color: 'bg-amber-50 text-amber-800' },
-  'التوحيد': { goalHours: 40, studiedSeconds: 0, sessions: 0, color: 'bg-amber-50 text-amber-800' },
-  'التجويد': { goalHours: 20, studiedSeconds: 0, sessions: 0, color: 'bg-amber-50 text-amber-800' },
-  'النحو': { goalHours: 70, studiedSeconds: 0, sessions: 0, color: 'bg-cyan-50 text-cyan-800' },
-  'الصرف': { goalHours: 50, studiedSeconds: 0, sessions: 0, color: 'bg-cyan-50 text-cyan-800' },
-  'البلاغة': { goalHours: 50, studiedSeconds: 0, sessions: 0, color: 'bg-cyan-50 text-cyan-800' },
-  'الأدب والنصوص': { goalHours: 40, studiedSeconds: 0, sessions: 0, color: 'bg-cyan-50 text-cyan-800' },
-  'المطالعة والإنشاء': { goalHours: 20, studiedSeconds: 0, sessions: 0, color: 'bg-cyan-50 text-cyan-800' },
-};
+// Default subjects — empty so each student adds their own
+export const initialSubjects = {};

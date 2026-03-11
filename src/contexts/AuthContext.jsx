@@ -8,6 +8,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithPopup,
   signOut,
+  deleteUser,
 } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase';
 
@@ -30,6 +31,7 @@ function getArabicAuthError(code) {
     'auth/popup-blocked': 'تم حظر النافذة المنبثقة. يرجى السماح بالنوافذ المنبثقة.',
     'auth/cancelled-popup-request': '', // silent — user just closed the popup
     'auth/account-exists-with-different-credential': 'هذا البريد مسجل بطريقة أخرى. جرّب تسجيل الدخول بالبريد وكلمة المرور.',
+    'auth/requires-recent-login': 'لأسباب أمنية، يرجى تسجيل الخروج ثم الدخول مجدداً لاتخاذ هذا الإجراء.',
   };
   return map[code] || 'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.';
 }
@@ -89,8 +91,20 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  const deleteAccount = useCallback(async () => {
+    try {
+      if (auth.currentUser) {
+        await deleteUser(auth.currentUser);
+        return { success: true };
+      }
+      return { success: false, error: 'المستخدم غير مسجل الدخول' };
+    } catch (err) {
+      return { success: false, error: getArabicAuthError(err.code) };
+    }
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, loginWithGoogle, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, loginWithGoogle, logout, deleteAccount }}>
       {children}
     </AuthContext.Provider>
   );

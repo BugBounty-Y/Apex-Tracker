@@ -18,15 +18,15 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 // ==========================================
 function AppInner() {
   const { theme, isDark } = useTheme();
-  const { user, loading: authLoading, logout } = useAuth();
+  const { user, loading: authLoading, logout, deleteAccount } = useAuth();
 
   // --- Data loading state ---
   const [dataLoaded, setDataLoaded] = useState(false);
 
-  const [subjects, setSubjects] = useState(initialSubjects);
+  const [subjects, setSubjects] = useState({});
   const [dailyLog, setDailyLog] = useState({});
   const [dailyGoal, setDailyGoal] = useState(3);
-  const [userProfile, setUserProfile] = useState({ name: '', examDate: '2026-06-06' });
+  const [userProfile, setUserProfile] = useState({ name: '', examDate: '' });
 
   const [activeSubject, setActiveSubject] = useState(null);
   const [currentView, setCurrentView] = useState('dashboard');
@@ -45,21 +45,21 @@ function AppInner() {
       if (cancelled) return;
 
       if (data) {
-        setSubjects(data.subjects || initialSubjects);
+        setSubjects(data.subjects || {});
         setDailyLog(data.dailyLog || {});
         setDailyGoal(data.dailyGoal || 3);
         setUserProfile(data.userProfile || {
-          name: user.displayName || 'طالب',
-          examDate: '2026-06-06',
+          name: user.displayName || '',
+          examDate: '',
         });
       } else {
-        // New user — set defaults
-        setSubjects(initialSubjects);
+        // New user — empty state
+        setSubjects({});
         setDailyLog({});
         setDailyGoal(3);
         setUserProfile({
-          name: user.displayName || 'طالب',
-          examDate: '2026-06-06',
+          name: user.displayName || '',
+          examDate: '',
         });
       }
       setDataLoaded(true);
@@ -79,8 +79,15 @@ function AppInner() {
 
   // --- Dynamic page title ---
   useEffect(() => {
-    document.title = `Apex Tracker — غرفة عمليات ${userProfile?.name || 'الطالب'}`;
+    document.title = `Apex Tracker — ${userProfile?.name || 'طالب'}`;
   }, [userProfile?.name]);
+
+  // --- Redirect new users to settings to fill their profile ---
+  useEffect(() => {
+    if (dataLoaded && (!userProfile?.name || !userProfile?.examDate)) {
+      setCurrentView('settings');
+    }
+  }, [dataLoaded, userProfile?.name, userProfile?.examDate]);
 
   // --- Streak (computed from daily log) ---
   const streak = useMemo(() => calculateStreak(dailyLog, userProfile?.timezone), [dailyLog, userProfile?.timezone]);
@@ -327,8 +334,6 @@ function AppInner() {
         isTimerRunning={timer.isRunning}
         activeSubject={activeSubject}
         userProfile={userProfile}
-        user={user}
-        onLogout={logout}
       />
 
       {/* Main Content */}
@@ -367,6 +372,8 @@ function AppInner() {
               dailyGoal={dailyGoal}
               setDailyGoal={setDailyGoal}
               user={user}
+              onLogout={logout}
+              onDeleteAccount={deleteAccount}
             />
           )}
         </div>
