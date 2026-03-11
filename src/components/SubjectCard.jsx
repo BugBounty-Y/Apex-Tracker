@@ -10,7 +10,8 @@ export default function SubjectCard({ name, data, isActive, isTimerRunning, onSu
   const progPercent = Math.min(100, (data.studiedSeconds / goalSec) * 100);
 
   const remainingDays = getRemainingDays(userProfile?.examDate);
-  const dailySec = remainSec / remainingDays;
+  const safeDays = Math.max(1, remainingDays);
+  const dailySec = remainSec / safeDays;
   const dReqH = Math.floor(dailySec / 3600);
   const dReqM = Math.floor((dailySec % 3600) / 60);
 
@@ -86,7 +87,7 @@ export default function SubjectCard({ name, data, isActive, isTimerRunning, onSu
             <Icons.Target />
             <span className="font-medium">يومياً:</span>
             <span className="font-semibold" style={{ color: 'var(--c-text-sub)' }}>
-              {isCompleted ? '✅' : `${dReqH}h ${dReqM}m`}
+              {isCompleted ? '✅' : remainingDays <= 0 ? '⏰' : `${dReqH}h ${dReqM}m`}
             </span>
           </div>
           <div className={`text-[11px] font-semibold transition-all duration-200 ${isActive ? 'text-violet-500' : ''}`}

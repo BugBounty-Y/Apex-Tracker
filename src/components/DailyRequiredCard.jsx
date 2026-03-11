@@ -18,7 +18,8 @@ export default function DailyRequiredCard({ subjects, userProfile }) {
     if (data.studiedSeconds >= goalSec) completedCount++;
   });
 
-  const dailyTotalSec = totalRemainSec / remainingDays;
+  const safeDays = Math.max(1, remainingDays);
+  const dailyTotalSec = totalRemainSec / safeDays;
   const dailyH = Math.floor(dailyTotalSec / 3600);
   const dailyM = Math.floor((dailyTotalSec % 3600) / 60);
 
@@ -73,9 +74,13 @@ export default function DailyRequiredCard({ subjects, userProfile }) {
         style={{ borderColor: 'var(--c-border)', color: 'var(--c-text-muted)' }}
       >
         <Icons.Target />
-        <span>
-          متبقي <strong className="font-bold" style={{ color: 'var(--c-text)' }}>{remainingDays}</strong> يوم للامتحان
-        </span>
+        {remainingDays > 0 ? (
+          <span>
+            متبقي <strong className="font-bold" style={{ color: 'var(--c-text)' }}>{remainingDays}</strong> يوم للامتحان
+          </span>
+        ) : (
+          <span className="font-bold" style={{ color: '#f97316' }}>حان وقت الامتحان!</span>
+        )}
       </div>
     </div>
   );

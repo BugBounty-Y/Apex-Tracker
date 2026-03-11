@@ -13,7 +13,12 @@ export function loadData() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw);
+    const data = JSON.parse(raw);
+    // Basic schema validation to prevent corrupted data from crashing the app
+    if (!data || typeof data !== 'object') return null;
+    if (data.subjects && typeof data.subjects !== 'object') return null;
+    if (data.dailyLog && typeof data.dailyLog !== 'object') return null;
+    return data;
   } catch {
     return null;
   }

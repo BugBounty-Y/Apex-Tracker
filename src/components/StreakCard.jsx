@@ -125,10 +125,15 @@ export default function StreakCard({ dailyLog, streak, userProfile }) {
       </div>
 
       {/* Footer */}
-      <div className="relative z-10 text-center mt-4 pt-4 border-t font-semibold text-sm"
-        style={{ borderColor: 'var(--c-border)', color: streak > 0 ? '#f97316' : 'var(--c-text-muted)' }}
+      <div className="relative z-10 text-center mt-4 pt-4 border-t"
+        style={{ borderColor: 'var(--c-border)' }}
       >
-        {getStatusText()}
+        <div className="font-semibold text-sm" style={{ color: streak > 0 ? '#f97316' : 'var(--c-text-muted)' }}>
+          {getStatusText()}
+        </div>
+        <div className="text-[10px] font-medium mt-1" style={{ color: 'var(--c-text-faint)' }}>
+          الحد الأدنى: 25 دقيقة دراسة لاحتساب اليوم
+        </div>
       </div>
     </div>
   );

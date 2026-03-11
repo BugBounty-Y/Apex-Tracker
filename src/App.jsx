@@ -111,6 +111,24 @@ function AppInner() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
 
+  // --- Sync with other tabs to prevent data loss ---
+  useEffect(() => {
+    if (timer.isRunning) return; // Don't sync while timer is active
+    const handleStorageChange = (e) => {
+      if (e.key !== 'apex-tracker-data' || !e.newValue) return;
+      try {
+        const newData = JSON.parse(e.newValue);
+        if (!newData) return;
+        setSubjects(newData.subjects || initialSubjects);
+        setDailyLog(newData.dailyLog || {});
+        setDailyGoal(newData.dailyGoal || 3);
+        setUserProfile(newData.userProfile || { name: 'يحيى', examDate: '2026-06-06' });
+      } catch { /* ignore parse errors */ }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [timer.isRunning]);
+
   // --- Day change detection ---
   useEffect(() => {
     const interval = setInterval(() => {

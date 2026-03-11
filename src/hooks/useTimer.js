@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { playNotificationSound } from '../utils/helpers';
 
 /**
@@ -67,9 +67,7 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete }) {
       } else {
         setTimeLeft(nextTimeLeft);
         if (timerModeRef.current === 'focus' && activeSubjectRef.current) {
-          // Clamp elapsed to the actual time that passed within the timer window
-          const clampedElapsed = Math.min(rawElapsed, rawElapsed); // rawElapsed is already real wall-clock
-          if (clampedElapsed > 0) onTickFocusRef.current?.(clampedElapsed);
+          if (rawElapsed > 0) onTickFocusRef.current?.(rawElapsed);
         }
       }
     }, 1000);
@@ -98,8 +96,8 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete }) {
     setTotalTimerSeconds(newTime);
   }, []);
 
-  // Timer theme based on mode
-  const getTimerTheme = () => {
+  // Timer theme based on mode (memoized to prevent unnecessary child re-renders)
+  const timerTheme = useMemo(() => {
     if (timerMode === 'shortBreak') return {
       stroke: 'stroke-emerald-400', glow: 'shadow-emerald-500/30',
       bg: 'bg-emerald-500', from: 'from-emerald-400', to: 'to-teal-600',
@@ -112,7 +110,7 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete }) {
       stroke: 'stroke-violet-500', glow: 'shadow-violet-500/30',
       bg: 'bg-violet-600', from: 'from-violet-400', to: 'to-indigo-600',
     };
-  };
+  }, [timerMode]);
 
   // Ring progress calculations
   const ringCircumference = 2 * Math.PI * 46;
@@ -129,7 +127,7 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete }) {
     toggleTimer,
     resetTimer,
     changeMode,
-    timerTheme: getTimerTheme(),
+    timerTheme,
     ringCircumference,
     ringOffset,
   };

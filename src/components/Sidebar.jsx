@@ -75,7 +75,7 @@ export default function Sidebar({
             <div>
               <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: isDark ? '#fbbf24' : '#d97706' }}>العد التنازلي للامتحان</div>
               <div className="text-xl font-black mt-0.5 tabular-nums text-amber-500">
-                {remainingDays} <span className="text-[11px] font-bold" style={{ color: isDark ? 'rgba(251,191,36,0.7)' : 'rgba(217,119,6,0.8)' }}>يوم متبقي</span>
+                {remainingDays} <span className="text-[11px] font-bold" style={{ color: isDark ? 'rgba(251,191,36,0.7)' : 'rgba(217,119,6,0.8)' }}>{remainingDays > 0 ? 'يوم متبقي' : 'حان الوقت!'}</span>
               </div>
             </div>
           </div>

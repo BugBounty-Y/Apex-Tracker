@@ -139,11 +139,11 @@ export default function DashboardPage({
               >
                 {remainingDays}
               </div>
-              <div className="relative z-10 text-[11px] font-bold mt-1.5 tracking-wide" style={{ color: isDark ? 'rgba(251,191,36,0.7)' : '#b45309' }}>يوم متبقي</div>
+              <div className="relative z-10 text-[11px] font-bold mt-1.5 tracking-wide" style={{ color: isDark ? 'rgba(251,191,36,0.7)' : '#b45309' }}>{remainingDays > 0 ? 'يوم متبقي' : 'حان وقت الامتحان!'}</div>
               {/* Urgency indicator */}
               {remainingDays <= 30 && (
                 <div className="relative z-10 mt-2.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-red-500/10 text-red-500 border border-red-500/20">
-                  ⚡ وقت حاسم
+                  {remainingDays === 0 ? '🔥 الامتحان الآن!' : '⚡ وقت حاسم'}
                 </div>
               )}
             </div>

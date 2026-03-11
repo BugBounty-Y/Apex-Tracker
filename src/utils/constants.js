@@ -11,7 +11,7 @@ export function getRemainingDays(examDateStr) {
   now.setHours(0, 0, 0, 0);
   const examDate = new Date(examDateStr || '2026-06-06T00:00:00');
   const diff = Math.ceil((examDate - now) / (1000 * 60 * 60 * 24));
-  return Math.max(1, diff);
+  return Math.max(0, diff);
 }
 
 
