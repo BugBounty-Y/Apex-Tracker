@@ -12,6 +12,8 @@ export default function Sidebar({
   isTimerRunning,
   activeSubject,
   userProfile,
+  user,
+  onLogout,
 }) {
   const { isDark, toggleTheme } = useTheme();
   const remainingDays = getRemainingDays(userProfile?.examDate);
@@ -137,7 +139,7 @@ export default function Sidebar({
           </div>
         )}
 
-        {/* Bottom Stats */}
+        {/* Bottom Stats + User */}
         <div className="p-3 border-t space-y-2 mt-auto" style={{ borderColor: 'var(--c-border)' }}>
           <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ backgroundColor: 'var(--c-elevated)' }}>
             <div className="p-2 bg-orange-500/10 rounded-xl text-orange-400">
@@ -166,6 +168,30 @@ export default function Sidebar({
             </div>
             {todayStudiedSeconds >= 3600 && <span className="text-lg">⚡</span>}
           </div>
+
+          {/* User info + Logout */}
+          {user && (
+            <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ backgroundColor: 'var(--c-elevated)' }}>
+              <div className="p-2 bg-zinc-500/10 rounded-xl" style={{ color: 'var(--c-text-muted)' }}>
+                <Icons.User />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--c-text-faint)' }}>الحساب</div>
+                <div className="text-xs font-medium truncate" dir="ltr" style={{ color: 'var(--c-text-sub)' }}>
+                  {user.email || 'Google'}
+                </div>
+              </div>
+              <button
+                onClick={onLogout}
+                className="p-2 rounded-xl transition-all hover:bg-red-500/10 hover:text-red-400"
+                style={{ color: 'var(--c-text-faint)' }}
+                aria-label="تسجيل الخروج"
+                title="تسجيل الخروج"
+              >
+                <Icons.LogOut />
+              </button>
+            </div>
+          )}
         </div>
       </aside>
 

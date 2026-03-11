@@ -4,35 +4,78 @@ import Sidebar from './components/Sidebar';
 import DashboardPage from './components/DashboardPage';
 import TimerPage from './components/TimerPage';
 import SettingsPage from './components/SettingsPage';
+import AuthPage from './components/AuthPage';
 import Modal from './components/Modal';
 import { useTimer } from './hooks/useTimer';
 import { initialSubjects, COLOR_KEYS, colorStringForKey } from './utils/constants';
 import { getTodayKey } from './utils/helpers';
-import { loadData, saveData, calculateStreak } from './utils/storage';
+import { loadData, saveData, saveUserData, loadOrMigrateUserData, calculateStreak } from './utils/storage';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 // ==========================================
-// INNER APP (needs ThemeProvider as parent)
+// INNER APP (needs ThemeProvider + AuthProvider as parents)
 // ==========================================
 function AppInner() {
   const { theme, isDark } = useTheme();
+  const { user, loading: authLoading, logout } = useAuth();
 
-  // --- Data State (loaded from localStorage ONCE) ---
-  const [savedData] = useState(() => loadData());
+  // --- Data loading state ---
+  const [dataLoaded, setDataLoaded] = useState(false);
 
-  const [subjects, setSubjects] = useState(() => savedData?.subjects || initialSubjects);
-  const [dailyLog, setDailyLog] = useState(() => savedData?.dailyLog || {});
-  const [dailyGoal, setDailyGoal] = useState(() => savedData?.dailyGoal || 3);
-  const [userProfile, setUserProfile] = useState(() =>
-    savedData?.userProfile || { name: 'يحيى', examDate: '2026-06-06' }
-  );
+  const [subjects, setSubjects] = useState(initialSubjects);
+  const [dailyLog, setDailyLog] = useState({});
+  const [dailyGoal, setDailyGoal] = useState(3);
+  const [userProfile, setUserProfile] = useState({ name: '', examDate: '2026-06-06' });
 
   const [activeSubject, setActiveSubject] = useState(null);
   const [currentView, setCurrentView] = useState('dashboard');
 
+  // --- Load data from Firestore when user logs in ---
+  useEffect(() => {
+    if (!user) {
+      // Reset state when logged out
+      setDataLoaded(false);
+      return;
+    }
+
+    let cancelled = false;
+    const load = async () => {
+      const data = await loadOrMigrateUserData(user.uid);
+      if (cancelled) return;
+
+      if (data) {
+        setSubjects(data.subjects || initialSubjects);
+        setDailyLog(data.dailyLog || {});
+        setDailyGoal(data.dailyGoal || 3);
+        setUserProfile(data.userProfile || {
+          name: user.displayName || 'طالب',
+          examDate: '2026-06-06',
+        });
+      } else {
+        // New user — set defaults
+        setSubjects(initialSubjects);
+        setDailyLog({});
+        setDailyGoal(3);
+        setUserProfile({
+          name: user.displayName || 'طالب',
+          examDate: '2026-06-06',
+        });
+      }
+      setDataLoaded(true);
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [user]);
+
   // --- Today tracking (using user's timezone from the start) ---
-  const [todayKey, setTodayKey] = useState(() => getTodayKey(savedData?.userProfile?.timezone));
+  const [todayKey, setTodayKey] = useState(() => getTodayKey());
   const todayStudiedSeconds = dailyLog[todayKey] || 0;
+
+  // Update todayKey when userProfile timezone changes
+  useEffect(() => {
+    setTodayKey(getTodayKey(userProfile?.timezone));
+  }, [userProfile?.timezone]);
 
   // --- Dynamic page title ---
   useEffect(() => {
@@ -55,7 +98,6 @@ function AppInner() {
   latestStateRef.current = { subjects, dailyLog, dailyGoal, userProfile };
 
   // --- Timer callbacks ---
-  // Ref for todayKey to avoid stale closure in onTickFocus
   const todayKeyRef = useRef(todayKey);
   todayKeyRef.current = todayKey;
 
@@ -94,40 +136,36 @@ function AppInner() {
   // --- Timer Hook ---
   const timer = useTimer({ activeSubject, onTickFocus, onSessionComplete });
 
-  // --- Persist to localStorage (debounced) ---
+  // --- Persist to localStorage (immediate) + Firestore (debounced) ---
+  const firestoreSaveTimeoutRef = useRef(null);
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      saveData({ subjects, dailyLog, dailyGoal, userProfile });
-    }, 1000);
-    return () => clearTimeout(timeout);
-  }, [subjects, dailyLog, dailyGoal, userProfile]);
+    if (!dataLoaded || !user) return;
+
+    const data = { subjects, dailyLog, dailyGoal, userProfile };
+
+    // Save to localStorage immediately (local cache)
+    saveData(data);
+
+    // Debounced save to Firestore (3 seconds to batch rapid changes)
+    if (firestoreSaveTimeoutRef.current) clearTimeout(firestoreSaveTimeoutRef.current);
+    firestoreSaveTimeoutRef.current = setTimeout(() => {
+      saveUserData(user.uid, data);
+    }, 3000);
+
+    return () => {
+      if (firestoreSaveTimeoutRef.current) clearTimeout(firestoreSaveTimeoutRef.current);
+    };
+  }, [subjects, dailyLog, dailyGoal, userProfile, dataLoaded, user]);
 
   // --- Save immediately on tab close to prevent data loss ---
   useEffect(() => {
     const handleBeforeUnload = () => {
+      // Save to localStorage immediately (Firestore is async and unreliable on unload)
       saveData(latestStateRef.current);
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
-
-  // --- Sync with other tabs to prevent data loss ---
-  useEffect(() => {
-    if (timer.isRunning) return; // Don't sync while timer is active
-    const handleStorageChange = (e) => {
-      if (e.key !== 'apex-tracker-data' || !e.newValue) return;
-      try {
-        const newData = JSON.parse(e.newValue);
-        if (!newData) return;
-        setSubjects(newData.subjects || initialSubjects);
-        setDailyLog(newData.dailyLog || {});
-        setDailyGoal(newData.dailyGoal || 3);
-        setUserProfile(newData.userProfile || { name: 'يحيى', examDate: '2026-06-06' });
-      } catch { /* ignore parse errors */ }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, [timer.isRunning]);
 
   // --- Day change detection ---
   useEffect(() => {
@@ -146,23 +184,59 @@ function AppInner() {
   }, []);
 
   // ==========================================
+  // AUTH GUARD — show auth page or loading
+  // ==========================================
+  if (authLoading) {
+    return (
+      <div dir="rtl" className={`h-screen flex items-center justify-center font-sans ${theme === 'light' ? 'light' : ''}`}
+        style={{ backgroundColor: 'var(--c-bg)' }}
+      >
+        <div className="flex flex-col items-center gap-4 animate-fade-in">
+          <div className="w-12 h-12 bg-gradient-to-br from-violet-600 to-violet-500 rounded-2xl flex items-center justify-center shadow-lg shadow-violet-600/20">
+            <span className="text-white font-black text-lg">A</span>
+          </div>
+          <div className="w-8 h-8 border-3 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthPage />;
+  }
+
+  if (!dataLoaded) {
+    return (
+      <div dir="rtl" className={`h-screen flex items-center justify-center font-sans ${theme === 'light' ? 'light' : ''}`}
+        style={{ backgroundColor: 'var(--c-bg)' }}
+      >
+        <div className="flex flex-col items-center gap-4 animate-fade-in">
+          <div className="w-12 h-12 bg-gradient-to-br from-violet-600 to-violet-500 rounded-2xl flex items-center justify-center shadow-lg shadow-violet-600/20">
+            <span className="text-white font-black text-lg">A</span>
+          </div>
+          <div className="w-8 h-8 border-3 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />
+          <p className="text-sm font-medium" style={{ color: 'var(--c-text-muted)' }}>جارٍ تحميل بياناتك...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ==========================================
   // ACTIONS
   // ==========================================
 
-  // Shared handler for selecting a subject (from dashboard or timer)
-  const handleSelectSubject = useCallback((subj, navigateToTimer = false) => {
+  const handleSelectSubject = (subj, navigateToTimer = false) => {
     if (timer.isRunning && activeSubject && activeSubject !== subj) {
       if (!window.confirm(`المؤقت يعمل حالياً على "${activeSubject}". هل تريد التبديل إلى "${subj}"؟`)) {
         return;
       }
       timer.resetTimer();
     }
-    // Only reset timer mode if changing to a different subject while not running
     const isNewSubject = activeSubject !== subj;
     setActiveSubject(subj);
     if (!timer.isRunning && isNewSubject) timer.changeMode('focus');
     if (navigateToTimer) setCurrentView('timer');
-  }, [timer, activeSubject]);
+  };
 
   const handleSubjectClick = (subj) => handleSelectSubject(subj, true);
   const handleSelectSubjectFromTimer = (subj) => handleSelectSubject(subj, false);
@@ -253,6 +327,8 @@ function AppInner() {
         isTimerRunning={timer.isRunning}
         activeSubject={activeSubject}
         userProfile={userProfile}
+        user={user}
+        onLogout={logout}
       />
 
       {/* Main Content */}
@@ -290,6 +366,7 @@ function AppInner() {
               setUserProfile={setUserProfile}
               dailyGoal={dailyGoal}
               setDailyGoal={setDailyGoal}
+              user={user}
             />
           )}
         </div>
@@ -409,12 +486,14 @@ function AppInner() {
 }
 
 // ==========================================
-// MAIN EXPORT — wraps with ThemeProvider
+// MAIN EXPORT — wraps with ThemeProvider + AuthProvider
 // ==========================================
 export default function App() {
   return (
     <ThemeProvider>
-      <AppInner />
+      <AuthProvider>
+        <AppInner />
+      </AuthProvider>
     </ThemeProvider>
   );
 }

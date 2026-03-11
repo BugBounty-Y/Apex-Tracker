@@ -1,9 +1,16 @@
 // ==========================================
-// localStorage PERSISTENCE LAYER
+// DATA PERSISTENCE LAYER
+// localStorage (local cache) + Firestore (cloud)
 // ==========================================
 import { parseTimezoneOffset, dateToLocalKey } from './helpers';
+import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../firebase';
 
 const STORAGE_KEY = 'apex-tracker-data';
+
+// ==========================================
+// LOCAL CACHE (localStorage)
+// ==========================================
 
 /**
  * Load all persisted data from localStorage.
@@ -14,7 +21,6 @@ export function loadData() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const data = JSON.parse(raw);
-    // Basic schema validation to prevent corrupted data from crashing the app
     if (!data || typeof data !== 'object') return null;
     if (data.subjects && typeof data.subjects !== 'object') return null;
     if (data.dailyLog && typeof data.dailyLog !== 'object') return null;
@@ -25,7 +31,7 @@ export function loadData() {
 }
 
 /**
- * Save application state to localStorage.
+ * Save application state to localStorage (local cache).
  */
 export function saveData(data) {
   try {
@@ -34,6 +40,92 @@ export function saveData(data) {
     // Storage full or unavailable — fail silently
   }
 }
+
+// ==========================================
+// FIRESTORE (cloud persistence)
+// ==========================================
+
+/**
+ * Load user data from Firestore.
+ * Returns null if no document exists or on error.
+ */
+export async function loadUserData(uid) {
+  if (!uid) return null;
+  try {
+    const snap = await getDoc(doc(db, 'users', uid));
+    if (!snap.exists()) return null;
+    const data = snap.data();
+    // Validate basic structure
+    if (!data || typeof data !== 'object') return null;
+    return data;
+  } catch (err) {
+    console.warn('Firestore load failed, falling back to local cache:', err.message);
+    return null;
+  }
+}
+
+/**
+ * Save user data to Firestore.
+ * Uses merge: true to avoid overwriting fields not included in the update.
+ */
+export async function saveUserData(uid, data) {
+  if (!uid || !data) return;
+  try {
+    await setDoc(doc(db, 'users', uid), {
+      subjects: data.subjects || {},
+      dailyLog: data.dailyLog || {},
+      dailyGoal: data.dailyGoal || 3,
+      userProfile: data.userProfile || {},
+      updatedAt: serverTimestamp(),
+    });
+  } catch (err) {
+    console.warn('Firestore save failed:', err.message);
+  }
+}
+
+/**
+ * Delete user data document from Firestore.
+ */
+export async function clearUserData(uid) {
+  if (!uid) return;
+  try {
+    await deleteDoc(doc(db, 'users', uid));
+  } catch (err) {
+    console.warn('Firestore delete failed:', err.message);
+  }
+}
+
+/**
+ * Migrate existing localStorage data to Firestore for first-time login.
+ * Only migrates if Firestore has no data and localStorage has data.
+ * Returns the data that should be used (Firestore > localStorage > null).
+ */
+export async function loadOrMigrateUserData(uid) {
+  if (!uid) return null;
+
+  // 1. Try loading from Firestore first
+  const firestoreData = await loadUserData(uid);
+  if (firestoreData) {
+    // Cloud data exists — use it and update local cache
+    saveData(firestoreData);
+    return firestoreData;
+  }
+
+  // 2. Firestore is empty — check if we have local data to migrate
+  const localData = loadData();
+  if (localData && localData.subjects) {
+    // Migrate local data to Firestore
+    await saveUserData(uid, localData);
+    return localData;
+  }
+
+  // 3. No data anywhere — new user
+  return null;
+}
+
+// ==========================================
+// STREAK CALCULATION (pure function)
+// ==========================================
 
 /**
  * Calculates the streak (consecutive days with at least 25 minutes of study).

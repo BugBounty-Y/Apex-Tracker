@@ -2,12 +2,14 @@ import { useState, useEffect, useMemo } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { Icons } from './Icons';
 import { parseTimezoneOffset } from '../utils/helpers';
+import { clearUserData } from '../utils/storage';
 
 export default function SettingsPage({
   userProfile,
   setUserProfile,
   dailyGoal,
   setDailyGoal,
+  user,
 }) {
   const { isDark } = useTheme();
 
@@ -44,10 +46,11 @@ export default function SettingsPage({
     setTimeout(() => setIsSaved(false), 3000);
   };
 
-  const handleClearData = () => {
+  const handleClearData = async () => {
     if (window.confirm('هل أنت متأكد من حذف جميع بياناتك (المواد، السجل، وساعات الدراسة)؟ لا يمكن التراجع عن هذا الإجراء.')) {
       if (window.confirm('تأكيد أخير: سيتم مسح كل شيء!')) {
-        localStorage.removeItem('apex-tracker-data'); // Keeps theme settings
+        localStorage.removeItem('apex-tracker-data');
+        if (user?.uid) await clearUserData(user.uid);
         window.location.reload();
       }
     }
@@ -69,6 +72,23 @@ export default function SettingsPage({
         </div>
         الإعدادات الشخصية
       </h2>
+
+      {/* Account info */}
+      {user && (
+        <div className="rounded-2xl border p-4 relative z-10 flex items-center gap-3"
+          style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' }}
+        >
+          <div className="p-2.5 bg-zinc-500/10 rounded-xl" style={{ color: 'var(--c-text-muted)' }}>
+            <Icons.User />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--c-text-faint)' }}>الحساب المسجّل</div>
+            <div className="text-sm font-medium truncate" dir="ltr" style={{ color: 'var(--c-text)' }}>
+              {user.email || 'Google Account'}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="rounded-2xl border p-6 md:p-8 relative z-10 shadow-sm"
         style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' }}
