@@ -61,6 +61,16 @@ export default function SettingsPage({
   const handleDeleteAccount = async () => {
     if (window.confirm('الإجراء خطير جداً: هل أنت متأكد من أنك تريد حذف حسابك نهائياً بجميع بياناته؟ لا يمكن استعادة الحساب بعد الحذف.')) {
       if (window.confirm('تأكيد أخير: سيتم مسح حسابك، وبياناتك، ولا يمكنك التراجع. هل تريد الاستمرار بالفعل؟')) {
+        // Firebase requires recent login to delete an account (within ~5 minutes).
+        const lastSignInDate = new Date(user?.metadata?.lastSignInTime || 0);
+        const diffMinutes = (new Date() - lastSignInDate) / (1000 * 60);
+
+        if (diffMinutes > 5) {
+          alert('لأسباب أمنية، يتطلب حذف الحساب أن تكون قد سجلت دخولك للتو (قبل 5 دقائق كحد أقصى).\n\nسنقوم بتسجيل خروجك الآن، يرجى إعادة تسجيل الدخول والمحاولة فوراً.');
+          onLogout();
+          return;
+        }
+
         // Clear data from Firestore first so we don't leave orphaned document
         if (user?.uid) await clearUserData(user.uid);
         
