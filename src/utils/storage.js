@@ -2,29 +2,89 @@
 // DATA PERSISTENCE LAYER
 // localStorage (local cache) + Firestore (cloud)
 // ==========================================
-import { parseTimezoneOffset, dateToLocalKey } from './helpers';
-import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { getTodayKey, shiftDateKey } from './helpers';
 import { db } from '../firebase';
 
-const STORAGE_KEY = 'apex-tracker-data';
+const STORAGE_KEY_PREFIX = 'apex-tracker-data';
+const LEGACY_STORAGE_KEY = STORAGE_KEY_PREFIX;
+
+function getStorageKey(uid) {
+  return uid ? `${STORAGE_KEY_PREFIX}:${uid}` : LEGACY_STORAGE_KEY;
+}
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function resolveUpdatedAtMs(value, fallbackValue) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (value instanceof Date) {
+    return value.getTime();
+  }
+
+  if (value && typeof value.toMillis === 'function') {
+    return value.toMillis();
+  }
+
+  return fallbackValue;
+}
+
+function normalizePersistedData(data, ownerUid = null, fallbackUpdatedAt = 0) {
+  if (!isPlainObject(data)) return null;
+
+  return {
+    subjects: isPlainObject(data.subjects) ? data.subjects : {},
+    dailyLog: isPlainObject(data.dailyLog) ? data.dailyLog : {},
+    dailyGoal: Math.max(1, Number.parseInt(data.dailyGoal, 10) || 3),
+    userProfile: isPlainObject(data.userProfile) ? data.userProfile : {},
+    pomodoroSettings: isPlainObject(data.pomodoroSettings) ? data.pomodoroSettings : {},
+    ownerUid: ownerUid || data.ownerUid || null,
+    updatedAt: resolveUpdatedAtMs(data.updatedAtMs ?? data.updatedAt, fallbackUpdatedAt),
+  };
+}
+
+function loadStoredSnapshot(storageKey, uid) {
+  const rawValue = localStorage.getItem(storageKey);
+  if (!rawValue) return null;
+
+  try {
+    const parsedData = JSON.parse(rawValue);
+    const normalizedData = normalizePersistedData(parsedData, uid, 0);
+
+    if (!normalizedData) return null;
+    if (uid && normalizedData.ownerUid && normalizedData.ownerUid !== uid) return null;
+
+    return uid && !normalizedData.ownerUid
+      ? { ...normalizedData, ownerUid: uid }
+      : normalizedData;
+  } catch {
+    return null;
+  }
+}
+
+export function createPersistedSnapshot(data = {}, ownerUid = null) {
+  return normalizePersistedData(isPlainObject(data) ? data : {}, ownerUid, Date.now());
+}
 
 // ==========================================
 // LOCAL CACHE (localStorage)
 // ==========================================
 
 /**
- * Load all persisted data from localStorage.
- * Returns null if nothing stored.
+ * Load persisted data for the current user from localStorage.
+ * Falls back to the legacy shared key for older installs.
  */
-export function loadData() {
+export function loadData(uid) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const data = JSON.parse(raw);
-    if (!data || typeof data !== 'object') return null;
-    if (data.subjects && typeof data.subjects !== 'object') return null;
-    if (data.dailyLog && typeof data.dailyLog !== 'object') return null;
-    return data;
+    if (uid) {
+      return loadStoredSnapshot(getStorageKey(uid), uid) || loadStoredSnapshot(LEGACY_STORAGE_KEY, uid);
+    }
+
+    return loadStoredSnapshot(LEGACY_STORAGE_KEY);
   } catch {
     return null;
   }
@@ -32,12 +92,51 @@ export function loadData() {
 
 /**
  * Save application state to localStorage (local cache).
+ * Returns the normalized snapshot that was written.
  */
-export function saveData(data) {
+export function saveData(data, uid) {
+  const snapshot = createPersistedSnapshot(data, uid);
+
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    const storageKey = getStorageKey(snapshot.ownerUid || uid);
+    localStorage.setItem(storageKey, JSON.stringify(snapshot));
+
+    if (snapshot.ownerUid) {
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
+    }
   } catch {
     // Storage full or unavailable — fail silently
+  }
+
+  return snapshot;
+}
+
+export function clearLocalData(uid) {
+  try {
+    if (uid) {
+      localStorage.removeItem(getStorageKey(uid));
+    }
+
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
+  } catch {
+    // Ignore storage errors while clearing local cache
+  }
+}
+
+export function clearAllLocalData() {
+  try {
+    const keysToRemove = [];
+
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(STORAGE_KEY_PREFIX)) {
+        keysToRemove.push(key);
+      }
+    }
+
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
+  } catch {
+    // Ignore storage errors while clearing local cache
   }
 }
 
@@ -47,40 +146,58 @@ export function saveData(data) {
 
 /**
  * Load user data from Firestore.
- * Returns null if no document exists or on error.
+ * Returns a status so callers can distinguish "missing document" from "network error".
  */
 export async function loadUserData(uid) {
-  if (!uid) return null;
+  if (!uid) return { status: 'missing', data: null };
+
   try {
     const snap = await getDoc(doc(db, 'users', uid));
-    if (!snap.exists()) return null;
-    const data = snap.data();
-    // Validate basic structure
-    if (!data || typeof data !== 'object') return null;
-    return data;
+    if (!snap.exists()) {
+      return { status: 'missing', data: null };
+    }
+
+    const normalizedData = normalizePersistedData(snap.data(), uid, 0);
+    return { status: 'success', data: normalizedData };
   } catch (err) {
     console.warn('Firestore load failed, falling back to local cache:', err.message);
-    return null;
+    return { status: 'error', data: null };
   }
+}
+
+export function resolvePreferredUserData(localData, firestoreData) {
+  if (localData && firestoreData) {
+    return localData.updatedAt > firestoreData.updatedAt ? localData : firestoreData;
+  }
+
+  return firestoreData || localData || null;
 }
 
 /**
  * Save user data to Firestore.
- * Overwrites the document to ensure it acts as a perfect mirror of the local state.
+ * Returns true on success so the caller can coordinate retries safely.
  */
 export async function saveUserData(uid, data) {
-  if (!uid || !data) return;
+  if (!uid || !data) return false;
+
+  const snapshot = createPersistedSnapshot(data, uid);
+
   try {
     await setDoc(doc(db, 'users', uid), {
-      subjects: data.subjects || {},
-      dailyLog: data.dailyLog || {},
-      dailyGoal: data.dailyGoal || 3,
-      userProfile: data.userProfile || {},
-      pomodoroSettings: data.pomodoroSettings || {},
+      subjects: snapshot.subjects,
+      dailyLog: snapshot.dailyLog,
+      dailyGoal: snapshot.dailyGoal,
+      userProfile: snapshot.userProfile,
+      pomodoroSettings: snapshot.pomodoroSettings,
+      ownerUid: uid,
+      updatedAtMs: snapshot.updatedAt,
       updatedAt: serverTimestamp(),
     });
+
+    return true;
   } catch (err) {
     console.warn('Firestore save failed:', err.message);
+    return false;
   }
 }
 
@@ -88,33 +205,46 @@ export async function saveUserData(uid, data) {
  * Delete user data document from Firestore.
  */
 export async function clearUserData(uid) {
-  if (!uid) return;
+  if (!uid) return true;
+
   try {
     await deleteDoc(doc(db, 'users', uid));
+    return true;
   } catch (err) {
     console.warn('Firestore delete failed:', err.message);
+    return false;
   }
 }
 
 /**
- * Load user data from Firestore and enforce it onto localStorage.
- * Firestore is the primary source of truth.
- * Returns the data from Firestore, or null if no data exists.
+ * Load user data from Firestore and merge it with the local cache using updatedAt.
+ * The newest snapshot wins; Firestore failures never clear local data.
  */
 export async function loadOrMigrateUserData(uid) {
   if (!uid) return null;
 
-  // 1. Try loading from Firestore first
-  const firestoreData = await loadUserData(uid);
-  if (firestoreData) {
-    // Cloud data exists — force it onto local cache
-    saveData(firestoreData);
-    return firestoreData;
+  const localData = loadData(uid);
+  const firestoreResult = await loadUserData(uid);
+
+  if (firestoreResult.status === 'success') {
+    const resolvedData = resolvePreferredUserData(localData, firestoreResult.data);
+    if (resolvedData) saveData(resolvedData, uid);
+    return resolvedData;
   }
 
-  // 2. Firestore is empty — new user (do NOT migrate from localStorage)
-  // Clear any old local data so we don't accidentally load it later
-  localStorage.removeItem(STORAGE_KEY);
+  if (firestoreResult.status === 'error') {
+    if (localData) {
+      saveData(localData, uid);
+    }
+
+    return localData;
+  }
+
+  if (localData) {
+    saveData(localData, uid);
+    return localData;
+  }
+
   return null;
 }
 
@@ -129,30 +259,19 @@ export async function loadOrMigrateUserData(uid) {
 export function calculateStreak(dailyLog, userTimezone = 'auto') {
   if (!dailyLog || Object.keys(dailyLog).length === 0) return 0;
 
-  const offsetMinutes = parseTimezoneOffset(userTimezone);
-  const getLocKey = (d) => dateToLocalKey(d, offsetMinutes);
-
   let streak = 0;
-  let checkDate = new Date();
+  let checkKey = getTodayKey(userTimezone);
 
-  const todayKey = getLocKey(checkDate);
-  const todaySeconds = dailyLog[todayKey] || 0;
-
-  // Streak requires 25 minutes (1500 seconds)
-  if (todaySeconds < 1500) {
-    checkDate.setDate(checkDate.getDate() - 1);
+  if ((dailyLog[checkKey] || 0) < 1500) {
+    checkKey = shiftDateKey(checkKey, -1);
   }
 
-  // Count consecutive days (safety limit 3650 days = 10 years)
-  while (streak < 3650) {
-    const key = getLocKey(checkDate);
-    const seconds = dailyLog[key] || 0;
-    if (seconds >= 1500) {
-      streak++;
-      checkDate.setDate(checkDate.getDate() - 1);
-    } else {
-      break;
-    }
+  while (streak < 3650 && checkKey) {
+    const seconds = dailyLog[checkKey] || 0;
+    if (seconds < 1500) break;
+
+    streak += 1;
+    checkKey = shiftDateKey(checkKey, -1);
   }
 
   return streak;

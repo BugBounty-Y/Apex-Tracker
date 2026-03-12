@@ -13,7 +13,7 @@ export default function Sidebar({
   userProfile,
 }) {
   const { isDark, toggleTheme } = useTheme();
-  const remainingDays = getRemainingDays(userProfile?.examDate);
+  const remainingDays = getRemainingDays(userProfile?.examDate, userProfile?.timezone);
   const studentName = userProfile?.name || 'طالب';
   const studentInitial = studentName.charAt(0) || 'ط';
 

@@ -1,5 +1,6 @@
 import { Component } from 'react';
 import { Icons } from './Icons';
+import { clearAllLocalData } from '../utils/storage';
 
 export default class ErrorBoundary extends Component {
   constructor(props) {
@@ -37,7 +38,7 @@ export default class ErrorBoundary extends Component {
               <button 
                 onClick={() => {
                   if (window.confirm('ستفقد جميع بياناتك، هل أنت متأكد؟')) {
-                    localStorage.removeItem('apex-tracker-data');
+                    clearAllLocalData();
                     window.location.reload();
                   }
                 }}

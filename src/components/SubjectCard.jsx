@@ -9,7 +9,7 @@ export default function SubjectCard({ name, data, isActive, isTimerRunning, onSu
   const remainSec = Math.max(0, goalSec - data.studiedSeconds);
   const progPercent = Math.min(100, (data.studiedSeconds / goalSec) * 100);
 
-  const remainingDays = getRemainingDays(userProfile?.examDate);
+  const remainingDays = getRemainingDays(userProfile?.examDate, userProfile?.timezone);
   const safeDays = Math.max(1, remainingDays);
   const dailySec = remainSec / safeDays;
   const dReqH = Math.floor(dailySec / 3600);

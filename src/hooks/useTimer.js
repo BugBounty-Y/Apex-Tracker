@@ -304,9 +304,18 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete, pomodo
 
     const currentMode = timerModeRef.current;
     const currentSessions = completedSessionsRef.current;
+    let nextMode;
+    let nextSessions;
 
-    // Use getNextMode to seamlessly determine the next phase and update session counts
-    const { mode: nextMode, sessions: nextSessions } = getNextMode(currentMode, currentSessions);
+    if (currentMode === 'focus') {
+      nextMode = 'shortBreak';
+      nextSessions = currentSessions;
+    } else {
+      const nextPhase = getNextMode(currentMode, currentSessions);
+      nextMode = nextPhase.mode;
+      nextSessions = nextPhase.sessions;
+    }
+
     const newTime = getDurationForMode(nextMode);
 
     setTimerMode(nextMode);

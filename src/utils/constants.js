@@ -1,20 +1,25 @@
 // ==========================================
 // CONSTANTS & SYSTEM DATA
 // ==========================================
+import { getTodayKey, parseDateKey } from './helpers';
 
 /**
  * Calculates remaining days from today to exam date.
  * Falls back to at least 1 to avoid division by zero.
  */
-export function getRemainingDays(examDateStr) {
+export function getRemainingDays(examDateStr, userTimezone = 'auto') {
   if (!examDateStr) return 0;
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  const examDate = new Date(examDateStr);
-  
-  if (isNaN(examDate.getTime())) return 0; // Prevent NaN errors
-  
-  const diff = Math.ceil((examDate - now) / (1000 * 60 * 60 * 24));
+
+  const examDate = parseDateKey(examDateStr);
+  const today = parseDateKey(getTodayKey(userTimezone));
+
+  if (!examDate || !today) return 0;
+
+  const diff = Math.round(
+    (Date.UTC(examDate.year, examDate.month - 1, examDate.day) - Date.UTC(today.year, today.month - 1, today.day))
+    / (1000 * 60 * 60 * 24),
+  );
+
   return Math.max(0, diff);
 }
 

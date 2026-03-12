@@ -10,6 +10,7 @@ import { useTimer, DEFAULT_POMODORO_SETTINGS } from './hooks/useTimer';
 import { COLOR_KEYS, colorStringForKey } from './utils/constants';
 import { getTodayKey } from './utils/helpers';
 import { saveData, saveUserData, loadOrMigrateUserData, calculateStreak } from './utils/storage';
+import { incrementDailyLogEntry, incrementSubjectSessions, incrementSubjectStudyTime } from './utils/studyData';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
@@ -26,17 +27,20 @@ function AppInner() {
   const [subjects, setSubjects] = useState({});
   const [dailyLog, setDailyLog] = useState({});
   const [dailyGoal, setDailyGoal] = useState(3);
-  const [userProfile, setUserProfile] = useState({ name: '', examDate: '' });
+  const [userProfile, setUserProfile] = useState({ name: '', examDate: '', timezone: 'auto' });
   const [pomodoroSettings, setPomodoroSettings] = useState({ ...DEFAULT_POMODORO_SETTINGS });
 
   const [activeSubject, setActiveSubject] = useState(null);
   const [currentView, setCurrentView] = useState('dashboard');
 
+  useEffect(() => {
+    window.isClearingData = false;
+  }, []);
+
   // --- Load data from Firestore when user logs in ---
   useEffect(() => {
     if (!user) {
       // Reset state when logged out
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDataLoaded(false);
       return;
     }
@@ -50,9 +54,11 @@ function AppInner() {
         setSubjects(data.subjects || {});
         setDailyLog(data.dailyLog || {});
         setDailyGoal(data.dailyGoal || 3);
-        setUserProfile(data.userProfile || {
+        setUserProfile({
           name: user.displayName || '',
           examDate: '',
+          timezone: 'auto',
+          ...(data.userProfile || {}),
         });
         setPomodoroSettings({ ...DEFAULT_POMODORO_SETTINGS, ...(data.pomodoroSettings || {}) });
       } else {
@@ -63,6 +69,7 @@ function AppInner() {
         setUserProfile({
           name: user.displayName || '',
           examDate: '',
+          timezone: 'auto',
         });
         setPomodoroSettings({ ...DEFAULT_POMODORO_SETTINGS });
       }
@@ -78,7 +85,6 @@ function AppInner() {
 
   // Update todayKey when userProfile timezone changes
   useEffect(() => {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
     setTodayKey(getTodayKey(userProfile?.timezone));
   }, [userProfile?.timezone]);
 
@@ -90,7 +96,6 @@ function AppInner() {
   // --- Redirect new users to settings to fill their profile ---
   useEffect(() => {
     if (dataLoaded && (!userProfile?.name || !userProfile?.examDate)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCurrentView('settings');
     }
   }, [dataLoaded, userProfile?.name, userProfile?.examDate]);
@@ -106,92 +111,139 @@ function AppInner() {
   const [tempGoal, setTempGoal] = useState(dailyGoal);
   const [newSubjectData, setNewSubjectData] = useState({ name: '', goalHours: 50 });
 
-  // --- Ref for latest state (used in beforeunload) ---
+  // --- Ref for latest state (used in background flushes / beforeunload) ---
   const latestStateRef = useRef({ subjects, dailyLog, dailyGoal, userProfile, pomodoroSettings });
-
-  // --- Timer callbacks ---
-  const todayKeyRef = useRef(todayKey);
+  const latestSnapshotRef = useRef(null);
+  const firestoreSaveTimeoutRef = useRef(null);
+  const firestoreSaveInFlightRef = useRef(false);
+  const firestoreSaveQueuedRef = useRef(false);
 
   // Update refs without triggering render cycle
   useEffect(() => {
     latestStateRef.current = { subjects, dailyLog, dailyGoal, userProfile, pomodoroSettings };
-    todayKeyRef.current = todayKey;
   });
 
   const onTickFocus = useCallback((elapsed = 1) => {
     if (!elapsed || elapsed <= 0 || !activeSubject) return;
-    setSubjects(prev => {
-      if (!prev[activeSubject]) return prev;
-      return {
-        ...prev,
-        [activeSubject]: {
-          ...prev[activeSubject],
-          studiedSeconds: prev[activeSubject].studiedSeconds + elapsed,
-        },
-      };
-    });
-    setDailyLog(prev => {
-      const key = todayKeyRef.current;
-      return { ...prev, [key]: (prev[key] || 0) + elapsed };
-    });
-  }, [activeSubject]);
+    const studyKey = getTodayKey(userProfile?.timezone);
+
+    setSubjects((prev) => incrementSubjectStudyTime(prev, activeSubject, elapsed));
+    setDailyLog((prev) => incrementDailyLogEntry(prev, studyKey, elapsed));
+  }, [activeSubject, userProfile?.timezone]);
 
   const onSessionComplete = useCallback(() => {
     if (!activeSubject) return;
-    setSubjects(prev => {
-      if (!prev[activeSubject]) return prev;
-      return {
-        ...prev,
-        [activeSubject]: {
-          ...prev[activeSubject],
-          sessions: prev[activeSubject].sessions + 1,
-        },
-      };
-    });
+    setSubjects((prev) => incrementSubjectSessions(prev, activeSubject));
   }, [activeSubject]);
 
   // --- Timer Hook ---
   const timer = useTimer({ activeSubject, onTickFocus, onSessionComplete, pomodoroSettings });
 
-  // --- Persist to localStorage (immediate) + Firestore (debounced) ---
-  const firestoreSaveTimeoutRef = useRef(null);
+  const clearScheduledCloudSave = useCallback(() => {
+    if (firestoreSaveTimeoutRef.current) {
+      clearTimeout(firestoreSaveTimeoutRef.current);
+      firestoreSaveTimeoutRef.current = null;
+    }
+  }, []);
+
+  const flushCloudSave = useCallback(async () => {
+    clearScheduledCloudSave();
+
+    if (!user?.uid || window.isClearingData || !latestSnapshotRef.current) {
+      return;
+    }
+
+    if (firestoreSaveInFlightRef.current) {
+      firestoreSaveQueuedRef.current = true;
+      return;
+    }
+
+    firestoreSaveInFlightRef.current = true;
+    firestoreSaveQueuedRef.current = false;
+
+    const snapshot = latestSnapshotRef.current;
+    const snapshotVersion = snapshot.updatedAt;
+
+    try {
+      await saveUserData(user.uid, snapshot);
+    } finally {
+      firestoreSaveInFlightRef.current = false;
+
+      const hasNewerSnapshot = latestSnapshotRef.current
+        && latestSnapshotRef.current.updatedAt > snapshotVersion;
+
+      if (firestoreSaveQueuedRef.current || hasNewerSnapshot) {
+        firestoreSaveQueuedRef.current = false;
+        flushCloudSave();
+      }
+    }
+  }, [clearScheduledCloudSave, user?.uid]);
+
+  const scheduleCloudSave = useCallback((delayMs, resetDelay = true) => {
+    if (!user?.uid || window.isClearingData || !latestSnapshotRef.current) {
+      return;
+    }
+
+    if (firestoreSaveInFlightRef.current) {
+      firestoreSaveQueuedRef.current = true;
+      return;
+    }
+
+    if (firestoreSaveTimeoutRef.current && !resetDelay) {
+      return;
+    }
+
+    clearScheduledCloudSave();
+    firestoreSaveTimeoutRef.current = setTimeout(() => {
+      firestoreSaveTimeoutRef.current = null;
+      flushCloudSave();
+    }, delayMs);
+  }, [clearScheduledCloudSave, flushCloudSave, user?.uid]);
+
   useEffect(() => {
-    if (!dataLoaded || !user) return;
+    if (!dataLoaded) return;
 
     const data = { subjects, dailyLog, dailyGoal, userProfile, pomodoroSettings };
+    latestSnapshotRef.current = saveData(data, user?.uid);
 
-    // Save to localStorage immediately (local cache)
-    saveData(data);
+    if (!user?.uid) return;
 
-    // Debounced save to Firestore (3 seconds to batch rapid changes)
-    if (firestoreSaveTimeoutRef.current) clearTimeout(firestoreSaveTimeoutRef.current);
-    firestoreSaveTimeoutRef.current = setTimeout(() => {
-      saveUserData(user.uid, data);
-    }, 3000);
+    if (timer.isRunning) {
+      scheduleCloudSave(5000, false);
+      return;
+    }
 
-    return () => {
-      if (firestoreSaveTimeoutRef.current) clearTimeout(firestoreSaveTimeoutRef.current);
-    };
-  }, [subjects, dailyLog, dailyGoal, userProfile, pomodoroSettings, dataLoaded, user]);
+    scheduleCloudSave(1500, true);
+  }, [
+    subjects,
+    dailyLog,
+    dailyGoal,
+    userProfile,
+    pomodoroSettings,
+    dataLoaded,
+    user?.uid,
+    timer.isRunning,
+    scheduleCloudSave,
+  ]);
+
+  useEffect(() => () => {
+    clearScheduledCloudSave();
+  }, [clearScheduledCloudSave, user?.uid]);
 
   // --- Save immediately on tab close or hide to prevent data loss ---
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden' && !window.isClearingData) {
-        saveData(latestStateRef.current);
-        if (user?.uid) {
-          saveUserData(user.uid, latestStateRef.current);
-        }
+        latestSnapshotRef.current = saveData(latestStateRef.current, user?.uid);
+        flushCloudSave();
       }
     };
 
     const handleBeforeUnload = () => {
       if (window.isClearingData) return;
-      
-      saveData(latestStateRef.current);
-      if (user?.uid) {
-        saveUserData(user.uid, latestStateRef.current);
-      }
+
+      latestSnapshotRef.current = saveData(latestStateRef.current, user?.uid);
+      flushCloudSave();
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -201,16 +253,16 @@ function AppInner() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [user?.uid]);
+  }, [flushCloudSave, user?.uid]);
 
   // --- Day change detection ---
   useEffect(() => {
     const interval = setInterval(() => {
       const currentKey = getTodayKey(userProfile?.timezone);
-      if (currentKey !== todayKey) setTodayKey(currentKey);
-    }, 30000);
+      setTodayKey((prev) => (prev === currentKey ? prev : currentKey));
+    }, 1000);
     return () => clearInterval(interval);
-  }, [todayKey, userProfile?.timezone]);
+  }, [userProfile?.timezone]);
 
   // --- Notification permission ---
   // Requested interactively inside useTimer to improve UX

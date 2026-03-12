@@ -1,41 +1,31 @@
 import { useMemo } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
-import { parseTimezoneOffset, dateToLocalKey } from '../utils/helpers';
+import { getTodayKey, getWeekdayFromDateKey, shiftDateKey } from '../utils/helpers';
 
 export default function StreakCard({ dailyLog, streak, userProfile }) {
   const { isDark } = useTheme();
 
   const weekDays = useMemo(() => {
-    const offsetMinutes = parseTimezoneOffset(userProfile?.timezone);
-    const getLocKey = (d) => dateToLocalKey(d, offsetMinutes);
-
-    // Compute "today" in user's timezone
-    const now = new Date();
-    const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
-    const userNow = new Date(utcTime + (offsetMinutes * 60000));
-    
-    const currentDay = userNow.getDay(); // 0 is Sunday
-    const adjustedDay = currentDay === 0 ? 6 : currentDay - 1; // Start Monday (0) to Sunday (6)
-
-    const todayKey = getLocKey(now);
+    const todayKey = getTodayKey(userProfile?.timezone);
+    const currentDay = getWeekdayFromDateKey(todayKey);
+    const adjustedDay = currentDay === 0 ? 6 : currentDay - 1;
+    const weekStartKey = shiftDateKey(todayKey, -adjustedDay);
 
     const days = [];
     const labels = ['ن', 'ث', 'ع', 'خ', 'ج', 'س', 'ح'];
 
-    for (let i = 0; i < 7; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() - adjustedDay + i);
-      
-      const dateKey = getLocKey(d);
+    for (let i = 0; i < 7; i += 1) {
+      const dateKey = shiftDateKey(weekStartKey, i);
       const seconds = dailyLog[dateKey] || 0;
 
       days.push({
         label: labels[i],
         isToday: dateKey === todayKey,
-        hasStudied: seconds >= 1500, // 25 minutes minimum
-        isFuture: i > adjustedDay
+        hasStudied: seconds >= 1500,
+        isFuture: i > adjustedDay,
       });
     }
+
     return days;
   }, [dailyLog, userProfile?.timezone]);
 
@@ -46,7 +36,6 @@ export default function StreakCard({ dailyLog, streak, userProfile }) {
     return 'لا يمكن إيقافك! 🚀';
   };
 
-  // Dynamic fire intensity
   const fireSize = streak >= 7 ? 'text-[5rem]' : streak >= 3 ? 'text-[4.5rem]' : 'text-[3.5rem]';
   const fireGlow = streak >= 3
     ? 'drop-shadow-[0_0_25px_rgba(249,115,22,0.5)]'
@@ -57,7 +46,6 @@ export default function StreakCard({ dailyLog, streak, userProfile }) {
     <div className="rounded-2xl p-6 flex flex-col h-full relative overflow-hidden border transition-all duration-300 font-sans group"
       style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' }}
     >
-      {/* Background glow — intensifies with streak */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-44 h-44 rounded-full blur-[70px] pointer-events-none transition-all duration-1000"
         style={{
           backgroundColor: isDark
@@ -66,7 +54,6 @@ export default function StreakCard({ dailyLog, streak, userProfile }) {
         }}
       />
 
-      {/* Header */}
       <div className="relative z-10 flex justify-between items-center mb-5">
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-orange-500/10 text-orange-500">
@@ -87,7 +74,6 @@ export default function StreakCard({ dailyLog, streak, userProfile }) {
         </div>
       </div>
 
-      {/* Fire Icon */}
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center mb-4">
         <div className={`${fireSize} ${fireGlow} ${fireOpacity} filter will-change-transform transform-gpu transition-all duration-500`}
           style={streak >= 3 ? { animation: 'pulse 2s ease-in-out infinite' } : {}}
@@ -99,7 +85,6 @@ export default function StreakCard({ dailyLog, streak, userProfile }) {
         )}
       </div>
 
-      {/* Days row */}
       <div className="relative z-10 flex items-center justify-between gap-1.5 mt-auto" dir="ltr">
         {weekDays.map((day, i) => (
           <div
@@ -108,10 +93,10 @@ export default function StreakCard({ dailyLog, streak, userProfile }) {
               day.isToday && day.hasStudied
                 ? 'bg-gradient-to-br from-orange-500/20 to-amber-500/15 text-orange-500 ring-1 ring-orange-400/50 shadow-sm shadow-orange-500/10'
                 : day.isToday
-                ? 'ring-1.5'
-                : day.hasStudied
-                ? 'bg-orange-500/10 text-orange-500/80'
-                : ''
+                  ? 'ring-1.5'
+                  : day.hasStudied
+                    ? 'bg-orange-500/10 text-orange-500/80'
+                    : ''
             }`}
             style={{
               backgroundColor: day.isToday && !day.hasStudied ? 'var(--c-surface-alt)' : day.hasStudied ? undefined : 'var(--c-elevated)',
@@ -124,7 +109,6 @@ export default function StreakCard({ dailyLog, streak, userProfile }) {
         ))}
       </div>
 
-      {/* Footer */}
       <div className="relative z-10 text-center mt-4 pt-4 border-t"
         style={{ borderColor: 'var(--c-border)' }}
       >

@@ -21,7 +21,7 @@ export default function DashboardPage({
   userProfile,
 }) {
   const { isDark } = useTheme();
-  const remainingDays = getRemainingDays(userProfile?.examDate);
+  const remainingDays = getRemainingDays(userProfile?.examDate, userProfile?.timezone);
   const totalSubjects = Object.keys(subjects).length;
   const totalGoalHours = Object.values(subjects).reduce((s, d) => s + d.goalHours, 0);
   const totalStudiedHours = Object.values(subjects).reduce((s, d) => s + d.studiedSeconds, 0) / 3600;

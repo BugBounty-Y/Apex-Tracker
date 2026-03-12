@@ -1,8 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { Icons } from './Icons';
-import { parseTimezoneOffset, getTodayKey } from '../utils/helpers';
-import { clearUserData } from '../utils/storage';
+import {
+  getTodayKey,
+  getTimeZoneOffsetLabel,
+  normalizeTimeZone,
+  normalizeTimeZoneSelection,
+  TIMEZONE_OPTIONS,
+} from '../utils/helpers';
+import { clearLocalData, clearUserData, loadData, saveData, saveUserData } from '../utils/storage';
+
+function buildFormData(userProfile, dailyGoal) {
+  return {
+    name: userProfile?.name || '',
+    examDate: userProfile?.examDate || '',
+    timezone: normalizeTimeZoneSelection(userProfile?.timezone),
+    dailyGoal: dailyGoal || 3,
+  };
+}
 
 export default function SettingsPage({
   userProfile,
@@ -14,90 +29,121 @@ export default function SettingsPage({
   onDeleteAccount,
 }) {
   const { isDark } = useTheme();
-
-  // Local state for the form so we don't update parent on every keystroke
-  const [formData, setFormData] = useState({
-    name: userProfile?.name || '',
-    examDate: userProfile?.examDate || '',
-    timezone: userProfile?.timezone || 'auto',
-    dailyGoal: dailyGoal || 3,
-  });
-
-  // Sync local form state when props change externally
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setFormData({
-      name: userProfile?.name || '',
-      examDate: userProfile?.examDate || '',
-      timezone: userProfile?.timezone || 'auto',
-      dailyGoal: dailyGoal || 3,
-    });
-  }, [userProfile, dailyGoal]);
-
+  const [formData, setFormData] = useState(() => buildFormData(userProfile, dailyGoal));
   const [isSaved, setIsSaved] = useState(false);
+  const [isDangerActionRunning, setIsDangerActionRunning] = useState(false);
+
+  useEffect(() => {
+    setFormData(buildFormData(userProfile, dailyGoal));
+  }, [userProfile, dailyGoal]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
+
     setUserProfile({
       name: formData.name.trim() || 'طالب',
       examDate: formData.examDate,
-      timezone: formData.timezone || 'auto',
+      timezone: normalizeTimeZoneSelection(formData.timezone),
     });
-    setDailyGoal(Math.max(1, parseInt(formData.dailyGoal) || 1));
-    
+    setDailyGoal(Math.max(1, Number.parseInt(formData.dailyGoal, 10) || 1));
+
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 3000);
   };
 
   const handleClearData = async () => {
-    if (window.confirm('هل أنت متأكد من حذف جميع بياناتك (المواد، السجل، وساعات الدراسة)؟ لا يمكن التراجع عن هذا الإجراء.')) {
-      if (window.confirm('تأكيد أخير: سيتم مسح كل شيء!')) {
-        window.isClearingData = true; // Prevent App.jsx from saving state on reload
-        localStorage.removeItem('apex-tracker-data');
-        if (user?.uid) await clearUserData(user.uid);
-        window.location.reload();
+    if (isDangerActionRunning) return;
+
+    const firstConfirm = window.confirm('هل أنت متأكد من حذف جميع بياناتك (المواد، السجل، وساعات الدراسة)؟ لا يمكن التراجع عن هذا الإجراء.');
+    if (!firstConfirm) return;
+
+    const secondConfirm = window.confirm('تأكيد أخير: سيتم مسح كل شيء من هذا الحساب.');
+    if (!secondConfirm) return;
+
+    setIsDangerActionRunning(true);
+    window.isClearingData = true;
+
+    try {
+      const cloudCleared = user?.uid ? await clearUserData(user.uid) : true;
+      if (!cloudCleared) {
+        throw new Error('تعذر مسح البيانات السحابية الآن. تم إلغاء العملية لحماية بياناتك.');
       }
+
+      clearLocalData(user?.uid);
+      window.location.reload();
+    } catch (error) {
+      window.isClearingData = false;
+      setIsDangerActionRunning(false);
+      alert(error.message || 'تعذر مسح البيانات الآن. حاول مرة أخرى.');
     }
   };
 
   const handleDeleteAccount = async () => {
-    if (window.confirm('الإجراء خطير جداً: هل أنت متأكد من أنك تريد حذف حسابك نهائياً بجميع بياناته؟ لا يمكن استعادة الحساب بعد الحذف.')) {
-      if (window.confirm('تأكيد أخير: سيتم مسح حسابك، وبياناتك، ولا يمكنك التراجع. هل تريد الاستمرار بالفعل؟')) {
-        // Firebase requires recent login to delete an account (within ~5 minutes).
-        const lastSignInDate = new Date(user?.metadata?.lastSignInTime || 0);
-        const diffMinutes = (new Date() - lastSignInDate) / (1000 * 60);
+    if (isDangerActionRunning) return;
 
-        if (diffMinutes > 5) {
-          alert('لأسباب أمنية، يتطلب حذف الحساب أن تكون قد سجلت دخولك للتو (قبل 5 دقائق كحد أقصى).\n\nسنقوم بتسجيل خروجك الآن، يرجى إعادة تسجيل الدخول والمحاولة فوراً.');
-          onLogout();
-          return;
-        }
+    const firstConfirm = window.confirm('الإجراء خطير جداً: هل أنت متأكد من أنك تريد حذف حسابك نهائياً بجميع بياناته؟ لا يمكن استعادة الحساب بعد الحذف.');
+    if (!firstConfirm) return;
 
-        window.isClearingData = true; // Prevent App.jsx from saving state on reload
+    const secondConfirm = window.confirm('تأكيد أخير: سيتم حذف حسابك وبياناتك نهائياً. هل تريد الاستمرار بالفعل؟');
+    if (!secondConfirm) return;
 
-        // Clear data from Firestore first so we don't leave orphaned document
-        if (user?.uid) await clearUserData(user.uid);
-        
-        // Remove locally cached data
-        localStorage.removeItem('apex-tracker-data');
-        
-        // Delete the Firebase Auth User
-        const result = await onDeleteAccount();
-        if (!result.success) {
-          alert('تعذر حذف الحساب: ' + result.error);
+    const lastSignInDate = new Date(user?.metadata?.lastSignInTime || 0);
+    const diffMinutes = (Date.now() - lastSignInDate.getTime()) / (1000 * 60);
+
+    if (diffMinutes > 5) {
+      alert('لأسباب أمنية، يتطلب حذف الحساب أن تكون قد سجلت دخولك للتو (خلال آخر 5 دقائق).\n\nسيتم تسجيل خروجك الآن. أعد تسجيل الدخول ثم حاول مرة أخرى مباشرة.');
+      onLogout();
+      return;
+    }
+
+    const localBackup = loadData(user?.uid);
+
+    setIsDangerActionRunning(true);
+    window.isClearingData = true;
+
+    try {
+      const cloudCleared = user?.uid ? await clearUserData(user.uid) : true;
+      if (!cloudCleared) {
+        throw new Error('تعذر حذف بيانات Firestore الآن، لذلك تم إيقاف حذف الحساب لحماية البيانات.');
+      }
+
+      clearLocalData(user?.uid);
+
+      const result = await onDeleteAccount();
+      if (result.success) {
+        return;
+      }
+
+      if (localBackup) {
+        saveData(localBackup, user?.uid);
+
+        if (user?.uid) {
+          const restoredInCloud = await saveUserData(user.uid, localBackup);
+          if (!restoredInCloud) {
+            throw new Error('فشل حذف الحساب وتمت استعادة الكاش المحلي فقط. تحقق من الاتصال ثم حاول مرة أخرى.');
+          }
         }
       }
+
+      throw new Error(result.error || 'تعذر حذف الحساب.');
+    } catch (error) {
+      window.isClearingData = false;
+      setIsDangerActionRunning(false);
+      alert(error.message || 'تعذر حذف الحساب الآن. حاول مرة أخرى.');
     }
   };
 
-  const labelCls = "block text-sm font-semibold mb-2";
+  const labelCls = 'block text-sm font-semibold mb-2';
   const labelStyle = { color: 'var(--c-text-sub)' };
-  const inputCls = "w-full rounded-xl px-4 py-3 font-medium focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/40 outline-none transition-all border";
+  const inputCls = 'w-full rounded-xl px-4 py-3 font-medium focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/40 outline-none transition-all border';
   const inputStyle = { backgroundColor: 'var(--c-input)', borderColor: 'var(--c-border)', color: 'var(--c-text)' };
+  const selectedTimeZone = normalizeTimeZoneSelection(formData.timezone);
+  const activeTimeZone = normalizeTimeZone(selectedTimeZone);
+  const activeOffsetLabel = getTimeZoneOffsetLabel(selectedTimeZone);
+  const selectedTimeZoneLabel = TIMEZONE_OPTIONS.find((option) => option.value === selectedTimeZone)?.label || activeTimeZone;
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-fade-in relative">
-      {/* Decorative glow */}
       <div className="absolute top-10 left-10 w-64 h-64 rounded-full blur-[100px] pointer-events-none" style={{ backgroundColor: 'var(--c-glow-violet)' }} />
 
       <h2 className="text-xl md:text-2xl font-bold tracking-tight mb-6 flex items-center gap-3" style={{ color: 'var(--c-text)' }}>
@@ -107,7 +153,6 @@ export default function SettingsPage({
         الإعدادات الشخصية
       </h2>
 
-      {/* Account info */}
       {user && (
         <div className="rounded-2xl border p-4 relative z-10 flex items-center justify-between gap-3"
           style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' }}
@@ -128,8 +173,9 @@ export default function SettingsPage({
             onClick={onLogout}
             className="px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all hover:bg-red-500/10 hover:text-red-400"
             style={{ color: 'var(--c-text-faint)' }}
+            disabled={isDangerActionRunning}
           >
-            <Icons.LogOut /> 
+            <Icons.LogOut />
             <span className="hidden sm:inline">تسجيل الخروج</span>
           </button>
         </div>
@@ -140,7 +186,6 @@ export default function SettingsPage({
       >
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Name Input */}
             <div>
               <label htmlFor="student-name" className={labelCls} style={labelStyle}>الاسم الشخصي</label>
               <input
@@ -155,7 +200,6 @@ export default function SettingsPage({
               />
             </div>
 
-            {/* Daily Goal Input */}
             <div>
               <label htmlFor="daily-goal" className={labelCls} style={labelStyle}>الهدف اليومي (ساعات)</label>
               <input
@@ -171,13 +215,12 @@ export default function SettingsPage({
               />
             </div>
 
-            {/* Exam Date Input */}
             <div>
               <label htmlFor="exam-date" className={labelCls} style={labelStyle}>تاريخ بداية الامتحانات</label>
               <input
                 id="exam-date"
                 type="date"
-                min={getTodayKey(formData.timezone || 'auto')}
+                min={getTodayKey(selectedTimeZone)}
                 value={formData.examDate}
                 onChange={(e) => setFormData({ ...formData, examDate: e.target.value })}
                 className={inputCls}
@@ -185,52 +228,38 @@ export default function SettingsPage({
                 required
               />
               <p className="text-xs mt-2" style={{ color: 'var(--c-text-faint)' }}>
-                يستخدم لنظام العد التنازلي وحساب الاستمرارية وأيام المذاكرة المتبقية.
+                يُستخدم للعدّ التنازلي وحساب المطلوب يومياً بدقة حسب المنطقة الزمنية المختارة.
               </p>
             </div>
 
-            {/* Timezone Input */}
             <div>
               <label htmlFor="timezone" className={labelCls} style={labelStyle}>المنطقة الزمنية</label>
               <select
                 id="timezone"
-                value={formData.timezone}
+                value={selectedTimeZone}
                 onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
                 className={inputCls}
                 style={inputStyle}
               >
-                <option value="auto">تلقائي (حسب نظام جهازك)</option>
-                <option value="UTC-12">توقيت هاواي (UTC-12)</option>
-                <option value="UTC-8">توقيت المحيط الهادئ (UTC-8)</option>
-                <option value="UTC-5">توقيت الساحل الشرقي لأمريكا (UTC-5)</option>
-                <option value="UTC+0">توقيت جرينتش / لندن (UTC+0)</option>
-                <option value="UTC+1">توقيت وسط أوروبا / المغرب (UTC+1)</option>
-                <option value="UTC+2">توقيت شرق أوروبا / مصر (UTC+2)</option>
-                <option value="UTC+3">توقيت السعودية / مكة المكرمة (UTC+3)</option>
-                <option value="UTC+4">توقيت الإمارات العربية المتحدة (UTC+4)</option>
-                <option value="UTC+5:30">توقيت الهند (UTC+5:30)</option>
-                <option value="UTC+8">توقيت الصين / ماليزيا (UTC+8)</option>
-                <option value="UTC+9">توقيت اليابان (UTC+9)</option>
-                <option value="UTC+11">توقيت أستراليا (UTC+11)</option>
+                {TIMEZONE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
               </select>
               <p className="text-xs mt-2" style={{ color: 'var(--c-text-faint)' }}>
-                لتحديد موعد بدء واستئناف يومك الدراسي، يؤثر على الاستمرارية.
+                نستخدم مناطق IANA الحقيقية حتى يحسب التطبيق بداية اليوم و DST بشكل صحيح.
               </p>
-              {(() => {
-                const offsetMins = parseTimezoneOffset(userProfile?.timezone);
-                const sign = offsetMins >= 0 ? '+' : '-';
-                const absH = Math.floor(Math.abs(offsetMins) / 60);
-                const absM = Math.abs(offsetMins) % 60;
-                const label = `UTC${sign}${absH}${absM ? ':' + String(absM).padStart(2, '0') : ''}`;
-                return (
-                  <div className="mt-2.5 flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium"
-                    style={{ backgroundColor: 'var(--c-elevated)', color: 'var(--c-text-sub)' }}
-                  >
-                    <Icons.Timer />
-                    <span>المنطقة الزمنية المستخدمة حالياً: <strong className="font-bold" style={{ color: 'var(--c-text)' }}>{label}</strong></span>
-                  </div>
-                );
-              })()}
+              <div className="mt-2.5 flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium"
+                style={{ backgroundColor: 'var(--c-elevated)', color: 'var(--c-text-sub)' }}
+              >
+                <Icons.Timer />
+                <span>
+                  المنطقة المستخدمة حالياً: <strong className="font-bold" style={{ color: 'var(--c-text)' }}>{selectedTimeZoneLabel}</strong>
+                  {' · '}
+                  <strong className="font-bold" style={{ color: 'var(--c-text)' }}>{activeOffsetLabel}</strong>
+                  {' · '}
+                  <span dir="ltr">{activeTimeZone}</span>
+                </span>
+              </div>
             </div>
           </div>
 
@@ -251,7 +280,6 @@ export default function SettingsPage({
         </form>
       </div>
 
-      {/* Danger Zone */}
       <div className="mt-8 rounded-2xl border border-red-500/20 p-6 md:p-8 relative z-10"
         style={{ backgroundColor: isDark ? 'rgba(239, 68, 68, 0.02)' : 'rgba(239, 68, 68, 0.04)' }}
       >
@@ -259,20 +287,22 @@ export default function SettingsPage({
           <Icons.Wrench /> منطقة الخطر (Danger Zone)
         </h3>
         <p className="text-sm font-medium mb-5" style={{ color: 'var(--c-text-muted)' }}>
-          هذه الإجراءات لا يمكن التراجع عنها. يرجى توخي الحذر عند استخدامها.
+          هذه الإجراءات لا يمكن التراجع عنها. سنوقف العملية تلقائياً إذا فشل حذف البيانات السحابية أو حذف الحساب.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 mt-5">
           <button
             onClick={handleClearData}
-            className="px-6 py-3 rounded-xl text-sm font-semibold text-red-500 bg-red-500/10 hover:bg-red-500/20 ring-1 ring-red-500/20 transition-all flex items-center justify-center gap-2"
+            className="px-6 py-3 rounded-xl text-sm font-semibold text-red-500 bg-red-500/10 hover:bg-red-500/20 ring-1 ring-red-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={isDangerActionRunning}
           >
             <Icons.RotateCcw /> مسح جميع البيانات فقط
           </button>
-          
+
           <button
             onClick={handleDeleteAccount}
-            className="px-6 py-3 rounded-xl text-sm font-semibold text-white bg-red-600 hover:bg-red-500 shadow-sm shadow-red-600/15 transition-all active:scale-95 flex items-center justify-center gap-2"
+            className="px-6 py-3 rounded-xl text-sm font-semibold text-white bg-red-600 hover:bg-red-500 shadow-sm shadow-red-600/15 transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={isDangerActionRunning}
           >
             <Icons.Trash /> حذف الحساب نهائياً
           </button>

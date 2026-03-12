@@ -4,7 +4,7 @@ import { getRemainingDays } from '../utils/constants';
 
 export default function DailyRequiredCard({ subjects, userProfile }) {
   const { isDark } = useTheme();
-  const remainingDays = getRemainingDays(userProfile?.examDate);
+  const remainingDays = getRemainingDays(userProfile?.examDate, userProfile?.timezone);
 
   // Calculate total remaining seconds across all subjects
   let totalRemainSec = 0;
