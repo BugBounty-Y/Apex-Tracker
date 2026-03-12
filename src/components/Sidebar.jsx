@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Icons } from './Icons';
 import { formatHoursMins } from '../utils/helpers';
 import { getRemainingDays } from '../utils/constants';

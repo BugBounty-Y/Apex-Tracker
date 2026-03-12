@@ -7,9 +7,9 @@ import SettingsPage from './components/SettingsPage';
 import AuthPage from './components/AuthPage';
 import Modal from './components/Modal';
 import { useTimer } from './hooks/useTimer';
-import { initialSubjects, COLOR_KEYS, colorStringForKey } from './utils/constants';
+import { COLOR_KEYS, colorStringForKey } from './utils/constants';
 import { getTodayKey } from './utils/helpers';
-import { loadData, saveData, saveUserData, loadOrMigrateUserData, calculateStreak } from './utils/storage';
+import { saveData, saveUserData, loadOrMigrateUserData, calculateStreak } from './utils/storage';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
@@ -17,7 +17,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 // INNER APP (needs ThemeProvider + AuthProvider as parents)
 // ==========================================
 function AppInner() {
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
   const { user, loading: authLoading, logout, deleteAccount } = useAuth();
 
   // --- Data loading state ---
@@ -35,6 +35,7 @@ function AppInner() {
   useEffect(() => {
     if (!user) {
       // Reset state when logged out
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDataLoaded(false);
       return;
     }
@@ -74,6 +75,7 @@ function AppInner() {
 
   // Update todayKey when userProfile timezone changes
   useEffect(() => {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
     setTodayKey(getTodayKey(userProfile?.timezone));
   }, [userProfile?.timezone]);
 
@@ -85,6 +87,7 @@ function AppInner() {
   // --- Redirect new users to settings to fill their profile ---
   useEffect(() => {
     if (dataLoaded && (!userProfile?.name || !userProfile?.examDate)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCurrentView('settings');
     }
   }, [dataLoaded, userProfile?.name, userProfile?.examDate]);
@@ -102,11 +105,15 @@ function AppInner() {
 
   // --- Ref for latest state (used in beforeunload) ---
   const latestStateRef = useRef({ subjects, dailyLog, dailyGoal, userProfile });
-  latestStateRef.current = { subjects, dailyLog, dailyGoal, userProfile };
 
   // --- Timer callbacks ---
   const todayKeyRef = useRef(todayKey);
-  todayKeyRef.current = todayKey;
+
+  // Update refs without triggering render cycle
+  useEffect(() => {
+    latestStateRef.current = { subjects, dailyLog, dailyGoal, userProfile };
+    todayKeyRef.current = todayKey;
+  });
 
   const onTickFocus = useCallback((elapsed = 1) => {
     if (!elapsed || elapsed <= 0 || !activeSubject) return;
@@ -164,15 +171,32 @@ function AppInner() {
     };
   }, [subjects, dailyLog, dailyGoal, userProfile, dataLoaded, user]);
 
-  // --- Save immediately on tab close to prevent data loss ---
+  // --- Save immediately on tab close or hide to prevent data loss ---
   useEffect(() => {
-    const handleBeforeUnload = () => {
-      // Save to localStorage immediately (Firestore is async and unreliable on unload)
-      saveData(latestStateRef.current);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        saveData(latestStateRef.current);
+        if (user?.uid) {
+          saveUserData(user.uid, latestStateRef.current);
+        }
+      }
     };
+
+    const handleBeforeUnload = () => {
+      saveData(latestStateRef.current);
+      if (user?.uid) {
+        saveUserData(user.uid, latestStateRef.current);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, []);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [user?.uid]);
 
   // --- Day change detection ---
   useEffect(() => {
@@ -184,11 +208,8 @@ function AppInner() {
   }, [todayKey, userProfile?.timezone]);
 
   // --- Notification permission ---
-  useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
-  }, []);
+  // Requested interactively inside useTimer to improve UX
+
 
   // ==========================================
   // AUTH GUARD — show auth page or loading
@@ -264,7 +285,13 @@ function AppInner() {
   const saveSubjectSettings = () => {
     const hours = Math.max(0, parseInt(editFormData.studiedH) || 0);
     const minutes = Math.max(0, Math.min(59, parseInt(editFormData.studiedM) || 0));
-    const totalStudiedSeconds = hours * 3600 + minutes * 60;
+    
+    // Preserve leftover seconds from current time to not lose them during edits
+    const prevSeconds = subjects[editingSubject]?.studiedSeconds || 0;
+    const remainderSeconds = prevSeconds % 60;
+    
+    const totalStudiedSeconds = hours * 3600 + minutes * 60 + remainderSeconds;
+    
     setSubjects(prev => ({
       ...prev,
       [editingSubject]: {

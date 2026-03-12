@@ -73,10 +73,16 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete }) {
     }, 1000);
 
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRunning]); // Removes timeLeft dependency to prevent loop drift
 
   const toggleTimer = useCallback(() => {
     if (!activeSubject) return;
+    
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+    
     setTimerComplete(false);
     setIsRunning(prev => !prev);
   }, [activeSubject]);

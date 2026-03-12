@@ -66,7 +66,7 @@ export async function loadUserData(uid) {
 
 /**
  * Save user data to Firestore.
- * Uses merge: true to avoid overwriting fields not included in the update.
+ * Overwrites the document to ensure it acts as a perfect mirror of the local state.
  */
 export async function saveUserData(uid, data) {
   if (!uid || !data) return;

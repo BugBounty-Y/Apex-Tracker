@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { Icons } from './Icons';
-import { parseTimezoneOffset } from '../utils/helpers';
+import { parseTimezoneOffset, getTodayKey } from '../utils/helpers';
 import { clearUserData } from '../utils/storage';
 
 export default function SettingsPage({
@@ -25,6 +25,7 @@ export default function SettingsPage({
 
   // Sync local form state when props change externally
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFormData({
       name: userProfile?.name || '',
       examDate: userProfile?.examDate || '',
@@ -173,6 +174,7 @@ export default function SettingsPage({
               <input
                 id="exam-date"
                 type="date"
+                min={getTodayKey(formData.timezone || 'auto')}
                 value={formData.examDate}
                 onChange={(e) => setFormData({ ...formData, examDate: e.target.value })}
                 className={inputCls}

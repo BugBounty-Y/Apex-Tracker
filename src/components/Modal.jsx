@@ -1,9 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Icons } from './Icons';
-import { useTheme } from '../contexts/ThemeContext';
 
 export default function Modal({ isOpen, onClose, title, children, footer }) {
-  const { isDark } = useTheme();
   const modalRef = useRef(null);
 
   useEffect(() => {
