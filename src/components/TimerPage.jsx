@@ -3,17 +3,88 @@ import { Icons } from './Icons';
 import { formatTime, formatHoursMins } from '../utils/helpers';
 import { getColorTheme } from '../utils/constants';
 import { useTheme } from '../contexts/ThemeContext';
+import { DEFAULT_POMODORO_SETTINGS } from '../hooks/useTimer';
 
 export default function TimerPage({
   subjects,
   activeSubject,
   onSelectSubject,
   timer,
+  pomodoroSettings,
+  setPomodoroSettings,
 }) {
   const { isDark } = useTheme();
   const [selectorOpen, setSelectorOpen] = useState(false);
-  const { timerMode, timeLeft, isRunning, timerComplete, toggleTimer, resetTimer, changeMode, timerTheme, ringCircumference, ringOffset } = timer;
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [localSettings, setLocalSettings] = useState({ ...DEFAULT_POMODORO_SETTINGS, ...pomodoroSettings });
+
+  const {
+    timerMode, timeLeft, isRunning, isPaused, timerComplete, toggleTimer, resetTimer,
+    changeMode, skipToNextPhase, timerTheme, ringCircumference, ringOffset,
+    completedSessions, sessionsBeforeLongBreak,
+  } = timer;
+
+  // Determine button text based on timer state
+  const getButtonText = () => {
+    if (isRunning) return 'إيقاف مؤقت';
+    if (isPaused) return 'استئناف';
+    return 'بدء المؤقت';
+  };
+
   const studiedSeconds = subjects[activeSubject]?.studiedSeconds || 0;
+
+  // Handle opening settings panel: sync localSettings from current pomodoroSettings
+  const handleOpenSettings = () => {
+    setLocalSettings({ ...DEFAULT_POMODORO_SETTINGS, ...pomodoroSettings });
+    setSettingsOpen(true);
+  };
+
+  const handleSaveSettings = () => {
+    const validated = {
+      focusMinutes: Math.max(1, Math.min(120, parseInt(localSettings.focusMinutes) || 25)),
+      shortBreakMinutes: Math.max(1, Math.min(60, parseInt(localSettings.shortBreakMinutes) || 5)),
+      longBreakMinutes: Math.max(1, Math.min(60, parseInt(localSettings.longBreakMinutes) || 15)),
+      sessionsBeforeLongBreak: Math.max(1, Math.min(12, parseInt(localSettings.sessionsBeforeLongBreak) || 4)),
+    };
+    setPomodoroSettings(validated);
+    setSettingsOpen(false);
+  };
+
+  // Determine the complete banner message
+  const getCompleteBannerMessage = () => {
+    if (timerMode === 'focus') {
+      // Timer just completed focus, see what comes next
+      return '🎉 أحسنت! انتهت جلسة التركيز — جهّز نفسك للراحة';
+    }
+    if (timerMode === 'shortBreak') {
+      return '☕ انتهت الراحة القصيرة — عد للدراسة!';
+    }
+    return '🌟 انتهت الراحة الطويلة — دورة جديدة!';
+  };
+
+  // Session dots display
+  const renderSessionDots = () => {
+    const dots = [];
+    for (let i = 0; i < sessionsBeforeLongBreak; i++) {
+      const isCompleted = i < completedSessions;
+      const isCurrent = i === completedSessions && timerMode === 'focus';
+      dots.push(
+        <div
+          key={i}
+          className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
+            isCompleted
+              ? 'bg-violet-500 scale-100'
+              : isCurrent
+                ? 'bg-violet-400/50 animate-pulse scale-110 ring-2 ring-violet-400/30'
+                : ''
+          }`}
+          style={!isCompleted && !isCurrent ? { backgroundColor: isDark ? '#3f3f46' : '#d4d4d8' } : {}}
+          title={`جلسة ${i + 1}: ${isCompleted ? 'مكتملة' : isCurrent ? 'جارية' : 'قادمة'}`}
+        />
+      );
+    }
+    return dots;
+  };
 
   return (
     <div className="min-h-full flex flex-col animate-fade-in">
@@ -21,7 +92,7 @@ export default function TimerPage({
       {timerComplete && (
         <div className="bg-gradient-to-l from-emerald-600 to-teal-500 text-white text-center py-4 px-6 font-semibold text-base rounded-2xl mb-6 animate-fade-in flex items-center justify-center gap-3 shadow-lg shadow-emerald-500/15">
           <Icons.Bell />
-          {timerMode === 'focus' ? '🎉 أحسنت! انتهت جلسة التركيز' : '☕ انتهت فترة الراحة — عد للدراسة!'}
+          {getCompleteBannerMessage()}
         </div>
       )}
 
@@ -95,11 +166,13 @@ export default function TimerPage({
           <div className="rounded-2xl border p-4 space-y-1.5"
             style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' }}
           >
-            <div className="text-[10px] font-semibold uppercase tracking-widest px-1 mb-3" style={{ color: 'var(--c-text-faint)' }}>وضع الجلسة</div>
+            <div className="flex items-center justify-between px-1 mb-3">
+              <div className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--c-text-faint)' }}>وضع الجلسة</div>
+            </div>
             {[
-              { mode: 'focus', label: 'جلسة تركيز', desc: '25 دقيقة دراسة مركّزة', icon: <Icons.Book />, activeBg: 'bg-violet-500/15 text-violet-500', dotColor: 'bg-violet-500' },
-              { mode: 'shortBreak', label: 'راحة قصيرة', desc: '5 دقائق شحن الطاقة', icon: <Icons.Coffee />, activeBg: 'bg-emerald-500/15 text-emerald-500', dotColor: 'bg-emerald-500' },
-              { mode: 'longBreak', label: 'راحة طويلة', desc: '15 دقيقة فصل كامل', icon: <Icons.Coffee />, activeBg: 'bg-purple-500/15 text-purple-500', dotColor: 'bg-purple-500' },
+              { mode: 'focus', label: 'جلسة تركيز', desc: `${pomodoroSettings?.focusMinutes || 25} دقيقة دراسة مركّزة`, icon: <Icons.Book />, activeBg: 'bg-violet-500/15 text-violet-500', dotColor: 'bg-violet-500' },
+              { mode: 'shortBreak', label: 'راحة قصيرة', desc: `${pomodoroSettings?.shortBreakMinutes || 5} دقائق شحن الطاقة`, icon: <Icons.Coffee />, activeBg: 'bg-emerald-500/15 text-emerald-500', dotColor: 'bg-emerald-500' },
+              { mode: 'longBreak', label: 'راحة طويلة', desc: `${pomodoroSettings?.longBreakMinutes || 15} دقيقة فصل كامل`, icon: <Icons.Coffee />, activeBg: 'bg-purple-500/15 text-purple-500', dotColor: 'bg-purple-500' },
             ].map(({ mode, label, desc, icon, activeBg, dotColor }) => (
               <button
                 key={mode}
@@ -123,6 +196,123 @@ export default function TimerPage({
                 {timerMode === mode && <div className={`w-2 h-2 rounded-full ${dotColor} animate-pulse`} />}
               </button>
             ))}
+          </div>
+
+          {/* Pomodoro Settings Panel */}
+          <div className="rounded-2xl border overflow-hidden"
+            style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' }}
+          >
+            <button
+              onClick={settingsOpen ? () => setSettingsOpen(false) : handleOpenSettings}
+              className="w-full flex items-center justify-between p-4 transition-colors"
+              style={{ color: 'var(--c-text)' }}
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-amber-500/15 text-amber-500">
+                  <Icons.Sliders />
+                </div>
+                <div className="text-right">
+                  <div className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>إعدادات المؤقت</div>
+                  <div className="text-[10px]" style={{ color: 'var(--c-text-faint)' }}>تخصيص أوقات الجلسات</div>
+                </div>
+              </div>
+              <div className={`transition-transform duration-200 ${settingsOpen ? 'rotate-180' : ''}`} style={{ color: 'var(--c-text-muted)' }}>
+                <Icons.ChevronDown />
+              </div>
+            </button>
+
+            <div className={`transition-all duration-300 ease-in-out overflow-hidden ${settingsOpen ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'}`}>
+              <div className="border-t px-4 py-4 space-y-4" style={{ borderColor: 'var(--c-border)' }}>
+                {/* Focus Duration */}
+                <div>
+                  <label htmlFor="pomodoro-focus" className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--c-text-sub)' }}>
+                    مدة التركيز (دقيقة)
+                  </label>
+                  <input
+                    id="pomodoro-focus"
+                    type="number"
+                    min="1"
+                    max="120"
+                    value={localSettings.focusMinutes}
+                    onChange={(e) => setLocalSettings({ ...localSettings, focusMinutes: e.target.value })}
+                    className="w-full rounded-xl px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-violet-500/40 outline-none transition-all border"
+                    style={{ backgroundColor: 'var(--c-input)', borderColor: 'var(--c-border)', color: 'var(--c-text)' }}
+                  />
+                </div>
+
+                {/* Short Break Duration */}
+                <div>
+                  <label htmlFor="pomodoro-short" className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--c-text-sub)' }}>
+                    مدة الراحة القصيرة (دقيقة)
+                  </label>
+                  <input
+                    id="pomodoro-short"
+                    type="number"
+                    min="1"
+                    max="60"
+                    value={localSettings.shortBreakMinutes}
+                    onChange={(e) => setLocalSettings({ ...localSettings, shortBreakMinutes: e.target.value })}
+                    className="w-full rounded-xl px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-violet-500/40 outline-none transition-all border"
+                    style={{ backgroundColor: 'var(--c-input)', borderColor: 'var(--c-border)', color: 'var(--c-text)' }}
+                  />
+                </div>
+
+                {/* Long Break Duration */}
+                <div>
+                  <label htmlFor="pomodoro-long" className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--c-text-sub)' }}>
+                    مدة الراحة الطويلة (دقيقة)
+                  </label>
+                  <input
+                    id="pomodoro-long"
+                    type="number"
+                    min="1"
+                    max="60"
+                    value={localSettings.longBreakMinutes}
+                    onChange={(e) => setLocalSettings({ ...localSettings, longBreakMinutes: e.target.value })}
+                    className="w-full rounded-xl px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-violet-500/40 outline-none transition-all border"
+                    style={{ backgroundColor: 'var(--c-input)', borderColor: 'var(--c-border)', color: 'var(--c-text)' }}
+                  />
+                </div>
+
+                {/* Sessions Before Long Break */}
+                <div>
+                  <label htmlFor="pomodoro-sessions" className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--c-text-sub)' }}>
+                    جلسات التركيز قبل الراحة الطويلة
+                  </label>
+                  <input
+                    id="pomodoro-sessions"
+                    type="number"
+                    min="1"
+                    max="12"
+                    value={localSettings.sessionsBeforeLongBreak}
+                    onChange={(e) => setLocalSettings({ ...localSettings, sessionsBeforeLongBreak: e.target.value })}
+                    className="w-full rounded-xl px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-violet-500/40 outline-none transition-all border"
+                    style={{ backgroundColor: 'var(--c-input)', borderColor: 'var(--c-border)', color: 'var(--c-text)' }}
+                  />
+                </div>
+
+                {/* Save & Reset Buttons */}
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={handleSaveSettings}
+                    className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-violet-600 hover:bg-violet-500 shadow-sm shadow-violet-600/15 transition-all active:scale-95 flex items-center justify-center gap-2"
+                  >
+                    <Icons.Check />
+                    حفظ
+                  </button>
+                  <button
+                    onClick={() => {
+                      setLocalSettings({ ...DEFAULT_POMODORO_SETTINGS });
+                    }}
+                    className="px-4 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-80 flex items-center gap-2"
+                    style={{ color: 'var(--c-text-muted)' }}
+                  >
+                    <Icons.RotateCcw />
+                    إفتراضي
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Active Subject Stats */}
@@ -172,11 +362,21 @@ export default function TimerPage({
               ) : (
                 <>
                   {/* Subject badge */}
-                  <div className="relative z-10 mb-6 md:mb-8 flex items-center gap-2 px-4 py-2 rounded-full border"
+                  <div className="relative z-10 mb-4 md:mb-5 flex items-center gap-2 px-4 py-2 rounded-full border"
                     style={{ backgroundColor: 'var(--c-elevated)', borderColor: 'var(--c-border)' }}
                   >
                     <div className={`w-2 h-2 rounded-full ${getColorTheme(subjects[activeSubject]?.color || '').fill} ${isRunning ? 'animate-pulse' : ''}`} />
                     <span className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>{activeSubject}</span>
+                  </div>
+
+                  {/* Session progress dots */}
+                  <div className="relative z-10 mb-4 flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
+                      {renderSessionDots()}
+                    </div>
+                    <span className="text-[10px] font-semibold tabular-nums mr-2" style={{ color: 'var(--c-text-faint)' }}>
+                      {completedSessions}/{sessionsBeforeLongBreak}
+                    </span>
                   </div>
 
                   {/* Timer ring */}
@@ -186,17 +386,20 @@ export default function TimerPage({
                       <circle cx="50" cy="50" r="46" fill="none" className={`${timerTheme.stroke} transition-all duration-1000 ease-linear`} strokeWidth="3" strokeLinecap="round" strokeDasharray={ringCircumference} strokeDashoffset={ringOffset} />
                     </svg>
                     <div className="absolute flex flex-col items-center justify-center" role="timer" aria-live="polite">
-                      <div className="text-[3rem] sm:text-[4rem] lg:text-[4.5rem] font-bold tracking-tighter tabular-nums leading-none" style={{ color: 'var(--c-text)' }}>
+                      <div className={`text-[3rem] sm:text-[4rem] lg:text-[4.5rem] font-bold tracking-tighter tabular-nums leading-none transition-opacity duration-500 ${isPaused ? 'animate-pulse' : ''}`} style={{ color: 'var(--c-text)' }}>
                         {formatTime(timeLeft)}
                       </div>
                       <div className="text-[11px] font-semibold mt-2 uppercase tracking-wider" style={{ color: 'var(--c-text-muted)' }}>
-                        {timerMode === 'focus' ? 'تركيز عميق' : timerMode === 'shortBreak' ? 'راحة قصيرة' : 'راحة طويلة'}
+                        {isPaused
+                          ? '⏸ متوقف مؤقتاً'
+                          : timerMode === 'focus' ? 'تركيز عميق' : timerMode === 'shortBreak' ? 'راحة قصيرة' : 'راحة طويلة'
+                        }
                       </div>
                     </div>
                   </div>
 
                   {/* Controls */}
-                  <div className="relative z-10 flex items-center gap-4 w-full justify-center">
+                  <div className="relative z-10 flex items-center gap-3 w-full justify-center">
                     <button
                       onClick={resetTimer}
                       aria-label="إعادة تعيين المؤقت"
@@ -207,14 +410,25 @@ export default function TimerPage({
                     </button>
                     <button
                       onClick={toggleTimer}
-                      aria-label={isRunning ? 'إيقاف المؤقت' : 'بدء المؤقت'}
-                      className={`px-8 py-3.5 flex-1 max-w-[200px] flex items-center justify-center gap-3 rounded-full text-white text-base font-semibold transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg ${isRunning
+                      aria-label={getButtonText()}
+                      className={`px-8 py-3.5 flex-1 max-w-[220px] flex items-center justify-center gap-3 rounded-full text-white text-base font-semibold transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg ${isRunning
                           ? 'bg-zinc-700 hover:bg-zinc-600 text-red-400 shadow-black/20'
-                          : `${timerTheme.bg} ${timerTheme.glow}`
+                          : isPaused
+                            ? 'bg-amber-500 hover:bg-amber-400 shadow-amber-500/30'
+                            : `${timerTheme.bg} ${timerTheme.glow}`
                         }`}
                     >
                       {isRunning ? <Icons.Pause /> : <Icons.Play />}
-                      {isRunning ? 'إيقاف' : 'بدء المؤقت'}
+                      {getButtonText()}
+                    </button>
+                    <button
+                      onClick={skipToNextPhase}
+                      aria-label="تخطي إلى المرحلة التالية"
+                      title="تخطي إلى المرحلة التالية"
+                      className="w-12 h-12 md:w-13 md:h-13 shrink-0 flex items-center justify-center rounded-xl border transition-all hover:scale-110 duration-300"
+                      style={{ backgroundColor: 'var(--c-elevated)', borderColor: 'var(--c-border)', color: 'var(--c-text-muted)' }}
+                    >
+                      <Icons.SkipForward />
                     </button>
                   </div>
                 </>

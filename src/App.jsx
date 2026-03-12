@@ -6,7 +6,7 @@ import TimerPage from './components/TimerPage';
 import SettingsPage from './components/SettingsPage';
 import AuthPage from './components/AuthPage';
 import Modal from './components/Modal';
-import { useTimer } from './hooks/useTimer';
+import { useTimer, DEFAULT_POMODORO_SETTINGS } from './hooks/useTimer';
 import { COLOR_KEYS, colorStringForKey } from './utils/constants';
 import { getTodayKey } from './utils/helpers';
 import { saveData, saveUserData, loadOrMigrateUserData, calculateStreak } from './utils/storage';
@@ -27,6 +27,7 @@ function AppInner() {
   const [dailyLog, setDailyLog] = useState({});
   const [dailyGoal, setDailyGoal] = useState(3);
   const [userProfile, setUserProfile] = useState({ name: '', examDate: '' });
+  const [pomodoroSettings, setPomodoroSettings] = useState({ ...DEFAULT_POMODORO_SETTINGS });
 
   const [activeSubject, setActiveSubject] = useState(null);
   const [currentView, setCurrentView] = useState('dashboard');
@@ -53,6 +54,7 @@ function AppInner() {
           name: user.displayName || '',
           examDate: '',
         });
+        setPomodoroSettings({ ...DEFAULT_POMODORO_SETTINGS, ...(data.pomodoroSettings || {}) });
       } else {
         // New user — empty state
         setSubjects({});
@@ -62,6 +64,7 @@ function AppInner() {
           name: user.displayName || '',
           examDate: '',
         });
+        setPomodoroSettings({ ...DEFAULT_POMODORO_SETTINGS });
       }
       setDataLoaded(true);
     };
@@ -104,14 +107,14 @@ function AppInner() {
   const [newSubjectData, setNewSubjectData] = useState({ name: '', goalHours: 50 });
 
   // --- Ref for latest state (used in beforeunload) ---
-  const latestStateRef = useRef({ subjects, dailyLog, dailyGoal, userProfile });
+  const latestStateRef = useRef({ subjects, dailyLog, dailyGoal, userProfile, pomodoroSettings });
 
   // --- Timer callbacks ---
   const todayKeyRef = useRef(todayKey);
 
   // Update refs without triggering render cycle
   useEffect(() => {
-    latestStateRef.current = { subjects, dailyLog, dailyGoal, userProfile };
+    latestStateRef.current = { subjects, dailyLog, dailyGoal, userProfile, pomodoroSettings };
     todayKeyRef.current = todayKey;
   });
 
@@ -148,14 +151,14 @@ function AppInner() {
   }, [activeSubject]);
 
   // --- Timer Hook ---
-  const timer = useTimer({ activeSubject, onTickFocus, onSessionComplete });
+  const timer = useTimer({ activeSubject, onTickFocus, onSessionComplete, pomodoroSettings });
 
   // --- Persist to localStorage (immediate) + Firestore (debounced) ---
   const firestoreSaveTimeoutRef = useRef(null);
   useEffect(() => {
     if (!dataLoaded || !user) return;
 
-    const data = { subjects, dailyLog, dailyGoal, userProfile };
+    const data = { subjects, dailyLog, dailyGoal, userProfile, pomodoroSettings };
 
     // Save to localStorage immediately (local cache)
     saveData(data);
@@ -169,7 +172,7 @@ function AppInner() {
     return () => {
       if (firestoreSaveTimeoutRef.current) clearTimeout(firestoreSaveTimeoutRef.current);
     };
-  }, [subjects, dailyLog, dailyGoal, userProfile, dataLoaded, user]);
+  }, [subjects, dailyLog, dailyGoal, userProfile, pomodoroSettings, dataLoaded, user]);
 
   // --- Save immediately on tab close or hide to prevent data loss ---
   useEffect(() => {
@@ -389,6 +392,8 @@ function AppInner() {
               activeSubject={activeSubject}
               onSelectSubject={handleSelectSubjectFromTimer}
               timer={timer}
+              pomodoroSettings={pomodoroSettings}
+              setPomodoroSettings={setPomodoroSettings}
             />
           )}
 
