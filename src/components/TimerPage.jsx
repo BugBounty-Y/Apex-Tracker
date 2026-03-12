@@ -19,9 +19,9 @@ export default function TimerPage({
   const [localSettings, setLocalSettings] = useState({ ...DEFAULT_POMODORO_SETTINGS, ...pomodoroSettings });
 
   const {
-    timerMode, timeLeft, isRunning, isPaused, timerComplete, toggleTimer, resetTimer,
-    changeMode, skipToNextPhase, timerTheme, ringCircumference, ringOffset,
-    completedSessions, sessionsBeforeLongBreak,
+    timerMode, timeLeft, isRunning, isPaused, timerComplete, lastCompletedMode,
+    toggleTimer, resetTimer, changeMode, skipToNextPhase, timerTheme,
+    ringCircumference, ringOffset, completedSessions, sessionsBeforeLongBreak,
   } = timer;
 
   // Determine button text based on timer state
@@ -50,13 +50,15 @@ export default function TimerPage({
     setSettingsOpen(false);
   };
 
-  // Determine the complete banner message
+  // Determine the complete banner message based on what mode JUST finished
   const getCompleteBannerMessage = () => {
-    if (timerMode === 'focus') {
-      // Timer just completed focus, see what comes next
+    // Use lastCompletedMode (set when timer completes) so the message
+    // stays correct even after auto-advance changes timerMode
+    const completedMode = lastCompletedMode || timerMode;
+    if (completedMode === 'focus') {
       return '🎉 أحسنت! انتهت جلسة التركيز — جهّز نفسك للراحة';
     }
-    if (timerMode === 'shortBreak') {
+    if (completedMode === 'shortBreak') {
       return '☕ انتهت الراحة القصيرة — عد للدراسة!';
     }
     return '🌟 انتهت الراحة الطويلة — دورة جديدة!';

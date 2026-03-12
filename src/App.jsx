@@ -257,7 +257,7 @@ function AppInner() {
   // ==========================================
 
   const handleSelectSubject = (subj, navigateToTimer = false) => {
-    if (timer.isRunning && activeSubject && activeSubject !== subj) {
+    if ((timer.isRunning || timer.isPaused) && activeSubject && activeSubject !== subj) {
       if (!window.confirm(`المؤقت يعمل حالياً على "${activeSubject}". هل تريد التبديل إلى "${subj}"؟`)) {
         return;
       }
@@ -265,7 +265,7 @@ function AppInner() {
     }
     const isNewSubject = activeSubject !== subj;
     setActiveSubject(subj);
-    if (!timer.isRunning && isNewSubject) timer.changeMode('focus');
+    if (!timer.isRunning && !timer.isPaused && isNewSubject) timer.changeMode('focus');
     if (navigateToTimer) setCurrentView('timer');
   };
 

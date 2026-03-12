@@ -39,6 +39,7 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete, pomodo
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false); // Tracks if the timer was paused (vs never started)
   const [timerComplete, setTimerComplete] = useState(false);
+  const [lastCompletedMode, setLastCompletedMode] = useState(null); // Tracks which mode just finished for the banner
 
   // Use refs to avoid stale closures in setInterval
   const timerModeRef = useRef(timerMode);
@@ -149,6 +150,7 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete, pomodo
         setIsRunning(false);
         setIsPaused(false);
         setTimerComplete(true);
+        setLastCompletedMode(currentMode);
         playNotificationSound();
 
         const currentMode = timerModeRef.current;
@@ -212,6 +214,7 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete, pomodo
     }
     
     setTimerComplete(false);
+    setLastCompletedMode(null);
     setIsPaused(false);
     setIsRunning(true);
   }, [activeSubject]);
@@ -243,6 +246,7 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete, pomodo
     setIsRunning(false);
     setIsPaused(false);
     setTimerComplete(false);
+    setLastCompletedMode(null);
 
     // Cancel any pending auto-advance
     if (advanceTimeoutRef.current) {
@@ -264,6 +268,7 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete, pomodo
     setIsPaused(false);
     setTimerMode(mode);
     setTimerComplete(false);
+    setLastCompletedMode(null);
 
     // Cancel any pending auto-advance
     if (advanceTimeoutRef.current) {
@@ -285,6 +290,7 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete, pomodo
     setIsRunning(false);
     setIsPaused(false);
     setTimerComplete(false);
+    setLastCompletedMode(null);
 
     // Cancel any pending auto-advance
     if (advanceTimeoutRef.current) {
@@ -318,6 +324,7 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete, pomodo
     setIsRunning(false);
     setIsPaused(false);
     setTimerComplete(false);
+    setLastCompletedMode(null);
     setTimerMode('focus');
     setCompletedSessions(0);
 
@@ -360,6 +367,7 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete, pomodo
     isRunning,
     isPaused,
     timerComplete,
+    lastCompletedMode,
     totalTimerSeconds,
     completedSessions,
     sessionsBeforeLongBreak: settings.sessionsBeforeLongBreak,
