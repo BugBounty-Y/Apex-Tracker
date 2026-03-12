@@ -45,7 +45,7 @@ function getMotivationalPhrase() {
 }
 
 /* ─── SVG Ring Progress ─── */
-function TimerRing({ progress, isRunning, isPaused, timerMode, children }) {
+function TimerRing({ progress, isRunning, timerMode, children }) {
   const size = 280;
   const strokeWidth = 6;
   const radius = (size - strokeWidth) / 2;

@@ -21,6 +21,7 @@ const secondaryNavigation = [
   { to: '/settings', label: 'الإعدادات', icon: <Icons.Settings /> },
 ];
 
+// eslint-disable-next-line no-unused-vars
 const utilityNavigation = [
   { to: '/privacy', label: 'الخصوصية' },
   { to: '/terms', label: 'الشروط' },

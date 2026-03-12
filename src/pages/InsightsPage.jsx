@@ -53,7 +53,7 @@ export default function InsightsPage() {
                 <div className="app-progress">
                   <div
                     className="app-progress-bar"
-                    style={{ width: `${Math.min(100, (entry.seconds / Math.max(1, weeklyStats.weeklyGoal * 360)) * 100)}%` }}
+                    style={{ width: `${Math.min(100, (entry.seconds / Math.max(1, weeklyStats.weeklyGoal * 3600)) * 100)}%` }}
                   />
                 </div>
                 <div className="text-left text-[13px] font-semibold tabular-nums">{formatHours(entry.seconds)}h</div>

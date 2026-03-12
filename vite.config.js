@@ -5,6 +5,16 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          router: ['react-router-dom'],
+          firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore'],
+        },
+      },
+    },
+  },
   test: {
     environment: 'jsdom',
   },

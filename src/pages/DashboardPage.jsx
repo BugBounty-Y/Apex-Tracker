@@ -5,7 +5,13 @@ import SectionCard from '../components/ui/SectionCard';
 import StatCard from '../components/ui/StatCard';
 import EmptyState from '../components/ui/EmptyState';
 import { useAppData } from '../contexts/AppDataContext';
-import { formatDateKeyForDisplay, formatHoursMins, formatTimestampInTimeZone } from '../utils/helpers';
+import {
+  formatDateKeyForDisplay,
+  formatHoursMins,
+  formatTimestampInTimeZone,
+  getTodayKey,
+  getWeekdayFromDateKey,
+} from '../utils/helpers';
 
 function formatSessionTime(timestamp, userTimezone) {
   if (!timestamp) return 'بدون جلسات';
@@ -44,6 +50,13 @@ export default function DashboardPage() {
 
   const examDateLabel = formatExamDate(appData.userProfile.examDate);
   const hasExamDate = Boolean(examDateLabel);
+  const todayDateKey = getTodayKey(appData.userProfile.timezone);
+  const remainingWeeklyHours = Math.max(0, weeklyStats.weeklyGoal - weeklyStats.weeklyHours);
+  const remainingDaysThisWeek = Math.max(1, 7 - getWeekdayFromDateKey(todayDateKey));
+  const requiredTodayHours = remainingWeeklyHours <= 0
+    ? 0
+    : Math.max(1, Math.ceil(remainingWeeklyHours / remainingDaysThisWeek));
+  const showLegacyStats = dashboardSummary.todaySeconds < 0;
   const remainingDaysValue = hasExamDate ? dashboardSummary.remainingDays : '—';
   const remainingDaysTitle = hasExamDate ? 'يوم متبقٍ حتى الامتحان' : 'حدد موعد الامتحان';
   const remainingDaysHint = hasExamDate
@@ -67,10 +80,18 @@ export default function DashboardPage() {
       />
 
       {/* Stats Grid */}
+      {showLegacyStats && (
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={<Icons.ClockBurst />} label="وقت اليوم" value={formatHoursMins(dashboardSummary.todaySeconds)} hint="المسجل حتى هذه اللحظة." accent="#22d3ee" />
         <StatCard icon={<Icons.Crown />} label="الاستمرارية" value={`${streak} يوم`} hint="كل يوم يحتوي 25 دقيقة فأكثر." accent="#f97316" />
         <StatCard icon={<Icons.Rocket />} label="المطلوب اليوم" value={`${Math.max(1, Math.ceil((weeklyStats.weeklyGoal - weeklyStats.weeklyHours) / Math.max(1, 7 - dashboardSummary.weeklyStats.last7Days.filter((entry) => entry.seconds > 0).length)))}h`} hint="تقريب سريع لإغلاق الفجوة الأسبوعية." accent="#a78bfa" />
+        <StatCard icon={<Icons.Sparkles />} label="الهدف الأسبوعي" value={`${weeklyStats.weeklyCompletion.toFixed(0)}%`} hint={`${weeklyStats.weeklyHours.toFixed(1)}h من ${weeklyStats.weeklyGoal}h`} accent="#34d399" />
+      </section>
+      )}
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard icon={<Icons.ClockBurst />} label="وقت اليوم" value={formatHoursMins(dashboardSummary.todaySeconds)} hint="المسجل حتى هذه اللحظة." accent="#22d3ee" />
+        <StatCard icon={<Icons.Crown />} label="الاستمرارية" value={`${streak} يوم`} hint="كل يوم يحتوي 25 دقيقة فأكثر." accent="#f97316" />
+        <StatCard icon={<Icons.Rocket />} label="المطلوب اليوم" value={`${requiredTodayHours}h`} hint="تقريب سريع لإغلاق الفجوة الأسبوعية." accent="#a78bfa" />
         <StatCard icon={<Icons.Sparkles />} label="الهدف الأسبوعي" value={`${weeklyStats.weeklyCompletion.toFixed(0)}%`} hint={`${weeklyStats.weeklyHours.toFixed(1)}h من ${weeklyStats.weeklyGoal}h`} accent="#34d399" />
       </section>
 

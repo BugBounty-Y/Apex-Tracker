@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   incrementDailyLogEntry,
+  incrementDailyLogRange,
   incrementSubjectSessions,
   incrementSubjectStudyTime,
+  rebuildDailyLogFromSessions,
 } from './studyData';
 
 describe('study data helpers', () => {
@@ -30,5 +32,38 @@ describe('study data helpers', () => {
 
     expect(nextSubjects.Physics.sessions).toBe(3);
     expect(subjects.Physics.sessions).toBe(2);
+  });
+
+  it('splits tracked seconds across civil-day boundaries in the selected timezone', () => {
+    const nextDailyLog = incrementDailyLogRange(
+      {},
+      '2026-03-12T21:59:58.000Z',
+      5,
+      'Africa/Cairo',
+    );
+
+    expect(nextDailyLog).toEqual({
+      '2026-03-12': 2,
+      '2026-03-13': 3,
+    });
+  });
+
+  it('rebuilds daily totals from stored sessions using their actual time ranges', () => {
+    const rebuiltDailyLog = rebuildDailyLogFromSessions([
+      {
+        id: 'session-1',
+        subject: 'Math',
+        startedAt: '2026-03-12T21:59:58.000Z',
+        endedAt: '2026-03-12T22:00:03.000Z',
+        durationSeconds: 5,
+        type: 'focus',
+        completed: true,
+      },
+    ], 'Africa/Cairo');
+
+    expect(rebuiltDailyLog).toEqual({
+      '2026-03-12': 2,
+      '2026-03-13': 3,
+    });
   });
 });

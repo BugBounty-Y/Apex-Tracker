@@ -1,26 +1,14 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { playNotificationSound } from '../utils/helpers';
 import { DEFAULT_NOTIFICATION_SETTINGS, DEFAULT_POMODORO_SETTINGS } from '../utils/appData';
+import {
+  getDurationForTimerMode,
+  getNextTimerPhase,
+  shouldAutoStartNextPhase,
+} from '../utils/timerEngine';
 
-/**
- * Default Pomodoro settings.
- * These are used when no custom settings are provided.
- */
 export { DEFAULT_POMODORO_SETTINGS };
 
-/**
- * Custom hook for the Pomodoro timer engine.
- * 
- * Full Pomodoro cycle:
- * - Focus → Short Break → Focus → Short Break → Focus → Short Break → Focus → Long Break
- * - After a long break, the cycle resets
- * 
- * Supports:
- * - Pause / Resume with correct time tracking
- * - Auto-advance to next phase on completion
- * - Manual skip to next phase
- * - Configurable durations via pomodoroSettings
- */
 export function useTimer({
   activeSubject,
   onTickFocus,
@@ -28,8 +16,8 @@ export function useTimer({
   pomodoroSettings,
   notificationSettings,
   variant = 'pomodoro',
+  restoredState = null,
 }) {
-  // Merge custom settings with defaults
   const settings = useMemo(() => ({
     ...DEFAULT_POMODORO_SETTINGS,
     ...pomodoroSettings,
@@ -44,11 +32,10 @@ export function useTimer({
   const [totalTimerSeconds, setTotalTimerSeconds] = useState(settings.focusMinutes * 60);
   const [timeLeft, setTimeLeft] = useState(settings.focusMinutes * 60);
   const [isRunning, setIsRunning] = useState(false);
-  const [isPaused, setIsPaused] = useState(false); // Tracks if the timer was paused (vs never started)
+  const [isPaused, setIsPaused] = useState(false);
   const [timerComplete, setTimerComplete] = useState(false);
-  const [lastCompletedMode, setLastCompletedMode] = useState(null); // Tracks which mode just finished for the banner
+  const [lastCompletedMode, setLastCompletedMode] = useState(null);
 
-  // Use refs to avoid stale closures in setInterval
   const timerModeRef = useRef(timerMode);
   const activeSubjectRef = useRef(activeSubject);
   const onTickFocusRef = useRef(onTickFocus);
@@ -56,87 +43,83 @@ export function useTimer({
   const completedSessionsRef = useRef(completedSessions);
   const settingsRef = useRef(settings);
   const notificationSettingsRef = useRef(effectiveNotificationSettings);
-  const advanceTimeoutRef = useRef(null); // For cleaning up the auto-advance setTimeout
+  const timeLeftRef = useRef(timeLeft);
+  const advanceTimeoutRef = useRef(null);
+  const lastTickTimestampRef = useRef(null);
+  const tickRemainderMsRef = useRef(0);
+  const restoredStateKeyRef = useRef('');
 
-  timerModeRef.current = timerMode;
-  activeSubjectRef.current = activeSubject;
-  onTickFocusRef.current = onTickFocus;
-  onSessionCompleteRef.current = onSessionComplete;
-  completedSessionsRef.current = completedSessions;
-  settingsRef.current = settings;
-  notificationSettingsRef.current = effectiveNotificationSettings;
-
-  // Cleanup advance timeout on unmount
   useEffect(() => {
-    return () => {
-      if (advanceTimeoutRef.current) {
-        clearTimeout(advanceTimeoutRef.current);
-        advanceTimeoutRef.current = null;
-      }
-    };
+    timerModeRef.current = timerMode;
+    activeSubjectRef.current = activeSubject;
+    onTickFocusRef.current = onTickFocus;
+    onSessionCompleteRef.current = onSessionComplete;
+    completedSessionsRef.current = completedSessions;
+    settingsRef.current = settings;
+    notificationSettingsRef.current = effectiveNotificationSettings;
+    timeLeftRef.current = timeLeft;
+  }, [
+    activeSubject,
+    completedSessions,
+    effectiveNotificationSettings,
+    onSessionComplete,
+    onTickFocus,
+    settings,
+    timeLeft,
+    timerMode,
+  ]);
+
+  const clearPendingAdvance = useCallback(() => {
+    if (advanceTimeoutRef.current) {
+      clearTimeout(advanceTimeoutRef.current);
+      advanceTimeoutRef.current = null;
+    }
   }, []);
 
-  // When settings change externally (e.g. user updates pomodoro settings), 
-  // update timer duration only if timer is idle (not running, not paused, not complete)
+  const resetTickTracking = useCallback(() => {
+    lastTickTimestampRef.current = null;
+    tickRemainderMsRef.current = 0;
+  }, []);
+
+  useEffect(() => () => {
+    clearPendingAdvance();
+  }, [clearPendingAdvance]);
+
   useEffect(() => {
     if (isRunning || isPaused || timerComplete) return;
 
-    const newTime = timerMode === 'shortBreak'
-      ? settings.shortBreakMinutes * 60
-      : timerMode === 'longBreak'
-        ? settings.longBreakMinutes * 60
-        : settings.focusMinutes * 60;
-    
-    setTimeLeft(newTime);
-    setTotalTimerSeconds(newTime);
-  }, [settings.focusMinutes, settings.shortBreakMinutes, settings.longBreakMinutes, timerMode, isRunning, isPaused, timerComplete]);
+    const newTime = getDurationForTimerMode(timerMode, settings);
+    const timeoutId = window.setTimeout(() => {
+      setTimeLeft(newTime);
+      setTotalTimerSeconds(newTime);
+    }, 0);
 
-  /**
-   * Returns the duration in seconds for a given timer mode.
-   */
-  const getDurationForMode = useCallback((mode) => {
-    const s = settingsRef.current;
-    if (mode === 'shortBreak') return s.shortBreakMinutes * 60;
-    if (mode === 'longBreak') return s.longBreakMinutes * 60;
-    return s.focusMinutes * 60;
-  }, []);
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    isPaused,
+    isRunning,
+    settings,
+    timerComplete,
+    timerMode,
+  ]);
 
-  /**
-   * Determines the next mode after the current phase completes.
-   * Focus → Short Break (or Long Break after N sessions)
-   * Short Break / Long Break → Focus
-   */
-  const getNextMode = useCallback((currentMode, sessionsCompleted) => {
-    if (variant === 'focusOnly') {
-      return { mode: 'focus', sessions: sessionsCompleted };
-    }
+  const getDurationForMode = useCallback((mode) => getDurationForTimerMode(mode, settingsRef.current), []);
 
-    if (currentMode === 'focus') {
-      const newCompleted = sessionsCompleted + 1;
-      if (newCompleted >= settingsRef.current.sessionsBeforeLongBreak) {
-        return { mode: 'longBreak', sessions: newCompleted }; // Don't reset yet so UI shows full dots during break
-      }
-      return { mode: 'shortBreak', sessions: newCompleted };
-    }
-    // After long break finishes, reset the cycle back to 0
-    if (currentMode === 'longBreak') {
-      return { mode: 'focus', sessions: 0 };
-    }
-    // After short break, go back to focus
-    return { mode: 'focus', sessions: sessionsCompleted };
-  }, [variant]);
+  const getNextMode = useCallback((currentMode, sessionsCompleted) => (
+    getNextTimerPhase(currentMode, sessionsCompleted, settingsRef.current, variant)
+  ), [variant]);
 
   const applyPhaseState = useCallback((nextMode, nextSessions, options = {}) => {
     const {
       keepCompletionBanner = false,
       autoStart = false,
     } = options;
-    const newTime = getDurationForMode(nextMode);
+    const nextDuration = getDurationForMode(nextMode);
 
     setTimerMode(nextMode);
     setCompletedSessions(nextSessions);
-    setTimeLeft(newTime);
-    setTotalTimerSeconds(newTime);
+    setTimeLeft(nextDuration);
+    setTotalTimerSeconds(nextDuration);
     setIsPaused(false);
     setIsRunning(autoStart);
     setTimerComplete(keepCompletionBanner);
@@ -146,101 +129,167 @@ export function useTimer({
     }
   }, [getDurationForMode]);
 
-  /**
-   * Switches to the next Pomodoro phase after timer completion.
-   * Timer is stopped and ready for user to press start unless autoStart is requested.
-   */
   const advanceToNextPhase = useCallback((currentMode, sessionsCompleted, options = {}) => {
     const { mode: nextMode, sessions: nextSessions } = getNextMode(currentMode, sessionsCompleted);
     applyPhaseState(nextMode, nextSessions, options);
   }, [applyPhaseState, getNextMode]);
 
-  // Core timer engine — safe against tab throttling
+  const restoreTimerState = useCallback((snapshot) => {
+    if (!snapshot) return;
+
+    clearPendingAdvance();
+    resetTickTracking();
+
+    const nextMode = ['focus', 'shortBreak', 'longBreak'].includes(snapshot.timerMode)
+      ? snapshot.timerMode
+      : 'focus';
+    const fallbackDuration = getDurationForMode(nextMode);
+    const nextTotalTimerSeconds = Math.max(
+      1,
+      Number.isFinite(snapshot.totalTimerSeconds) ? snapshot.totalTimerSeconds : fallbackDuration,
+    );
+    const requestedTimeLeft = Number.isFinite(snapshot.timeLeft)
+      ? snapshot.timeLeft
+      : fallbackDuration;
+    const nextTimeLeft = Math.max(0, Math.min(requestedTimeLeft, nextTotalTimerSeconds));
+
+    setTimerMode(nextMode);
+    setCompletedSessions(Math.max(0, Number.parseInt(snapshot.completedSessions, 10) || 0));
+    setTotalTimerSeconds(nextTotalTimerSeconds);
+    setTimeLeft(nextTimeLeft);
+    setIsRunning(Boolean(snapshot.isRunning) && nextTimeLeft > 0);
+    setIsPaused(Boolean(snapshot.isPaused) && !snapshot.isRunning && nextTimeLeft > 0);
+    setTimerComplete(Boolean(snapshot.timerComplete));
+    setLastCompletedMode(snapshot.lastCompletedMode || null);
+  }, [clearPendingAdvance, getDurationForMode, resetTickTracking]);
+
+  const getTimerSnapshot = useCallback(() => ({
+    timerMode,
+    completedSessions,
+    totalTimerSeconds,
+    timeLeft,
+    isRunning,
+    isPaused,
+    timerComplete,
+    lastCompletedMode,
+  }), [
+    completedSessions,
+    isPaused,
+    isRunning,
+    lastCompletedMode,
+    timeLeft,
+    timerComplete,
+    timerMode,
+    totalTimerSeconds,
+  ]);
+
   useEffect(() => {
-    if (!isRunning || timeLeft <= 0) return;
+    const restorationKey = restoredState?.restorationKey;
+    if (!restorationKey || restorationKey === restoredStateKeyRef.current) {
+      return;
+    }
 
-    const endTime = Date.now() + timeLeft * 1000;
-    let lastTickTime = Date.now();
-
-    const interval = setInterval(() => {
-      const now = Date.now();
-      const nextTimeLeft = Math.round((endTime - now) / 1000);
-      
-      // Calculate actual elapsed seconds since last tick (handles tab throttling)
-      const rawElapsed = Math.max(0, Math.round((now - lastTickTime) / 1000));
-      lastTickTime = now;
-
-      if (nextTimeLeft <= 0) {
-        // Timer completed
-        // Calculate the actual remaining seconds that were consumed in this final tick
-        const previousTimeLeft = Math.max(0, Math.round((endTime - (now - rawElapsed * 1000)) / 1000));
-        const finalSeconds = Math.min(rawElapsed, previousTimeLeft);
-
-        const currentMode = timerModeRef.current;
-
-        setTimeLeft(0);
-        setIsRunning(false);
-        setIsPaused(false);
-        setTimerComplete(true);
-        setLastCompletedMode(currentMode);
-
-        // Record study time and session completion for focus mode
-        if (currentMode === 'focus' && activeSubjectRef.current) {
-          if (finalSeconds > 0) onTickFocusRef.current?.(finalSeconds);
-          onSessionCompleteRef.current?.();
-        }
-
-        const isBreakMode = currentMode === 'shortBreak' || currentMode === 'longBreak';
-        const shouldPlaySound = notificationSettingsRef.current.soundEnabled;
-        const shouldShowNotification = isBreakMode
-          ? notificationSettingsRef.current.breakEndNotification
-          : notificationSettingsRef.current.sessionEndNotification;
-
-        if (shouldPlaySound) {
-          playNotificationSound();
-        }
-
-        // Browser notification
-        if (shouldShowNotification && 'Notification' in window && Notification.permission === 'granted') {
-          new Notification('⏰ انتهى الوقت!', {
-            body: isBreakMode
-              ? 'انتهت فترة الراحة، استعد للدراسة!'
-              : `أحسنت! المشوار اكتمل في ${activeSubjectRef.current || 'هذه الجلسة'}`,
-          });
-        }
-
-        // Clear any previous advance timeout before setting a new one
-        if (advanceTimeoutRef.current) {
-          clearTimeout(advanceTimeoutRef.current);
-        }
-
-        // Auto-advance to the next phase after a short delay
-        // so the user sees the completion banner briefly
-          advanceTimeoutRef.current = setTimeout(() => {
-            advanceTimeoutRef.current = null;
-            advanceToNextPhase(currentMode, completedSessionsRef.current, { keepCompletionBanner: true });
-          }, 1500);
-      } else {
-        // Timer still running — update display and track focus time
-        setTimeLeft(nextTimeLeft);
-        if (timerModeRef.current === 'focus' && activeSubjectRef.current) {
-          if (rawElapsed > 0) onTickFocusRef.current?.(rawElapsed);
-        }
+    restoredStateKeyRef.current = restorationKey;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) {
+        restoreTimerState(restoredState);
       }
-    }, 1000);
+    });
 
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRunning, advanceToNextPhase]);
+    return () => {
+      cancelled = true;
+    };
+  }, [restoreTimerState, restoredState]);
 
-  /**
-   * Start or resume the timer. When resuming from pause,
-   * the timer continues from where it left off (timeLeft is preserved).
-   */
+  useEffect(() => {
+    if (!isRunning || timeLeftRef.current <= 0) {
+      resetTickTracking();
+      return undefined;
+    }
+
+    lastTickTimestampRef.current = Date.now();
+
+    const interval = window.setInterval(() => {
+      const now = Date.now();
+      const previousTickTimestamp = lastTickTimestampRef.current ?? now;
+      const elapsedMs = Math.max(0, now - previousTickTimestamp) + tickRemainderMsRef.current;
+      const elapsedSeconds = Math.floor(elapsedMs / 1000);
+
+      lastTickTimestampRef.current = now;
+      tickRemainderMsRef.current = elapsedMs % 1000;
+
+      if (elapsedSeconds <= 0) {
+        return;
+      }
+
+      const currentMode = timerModeRef.current;
+      const previousTimeLeft = timeLeftRef.current;
+      const consumedSeconds = Math.min(previousTimeLeft, elapsedSeconds);
+      const nextTimeLeft = Math.max(0, previousTimeLeft - elapsedSeconds);
+
+      if (currentMode === 'focus' && activeSubjectRef.current && consumedSeconds > 0) {
+        onTickFocusRef.current?.(consumedSeconds);
+      }
+
+      if (nextTimeLeft > 0) {
+        setTimeLeft(nextTimeLeft);
+        return;
+      }
+
+      setTimeLeft(0);
+      setIsRunning(false);
+      setIsPaused(false);
+      setTimerComplete(true);
+      setLastCompletedMode(currentMode);
+      resetTickTracking();
+
+      if (currentMode === 'focus' && activeSubjectRef.current) {
+        onSessionCompleteRef.current?.();
+      }
+
+      const isBreakMode = currentMode === 'shortBreak' || currentMode === 'longBreak';
+      const shouldPlaySound = notificationSettingsRef.current.soundEnabled;
+      const shouldShowNotification = isBreakMode
+        ? notificationSettingsRef.current.breakEndNotification
+        : notificationSettingsRef.current.sessionEndNotification;
+
+      if (shouldPlaySound) {
+        playNotificationSound();
+      }
+
+      if (shouldShowNotification && 'Notification' in window && Notification.permission === 'granted') {
+        new Notification('⏰ انتهى الوقت!', {
+          body: isBreakMode
+            ? 'انتهت فترة الراحة، استعد للدراسة!'
+            : `أحسنت! المشوار اكتمل في ${activeSubjectRef.current || 'هذه الجلسة'}`,
+        });
+      }
+
+      const nextPhase = getNextMode(currentMode, completedSessionsRef.current);
+      const autoStartNextPhase = shouldAutoStartNextPhase(
+        currentMode,
+        nextPhase.mode,
+        settingsRef.current,
+        variant,
+      );
+
+      clearPendingAdvance();
+      advanceTimeoutRef.current = window.setTimeout(() => {
+        advanceTimeoutRef.current = null;
+        advanceToNextPhase(currentMode, completedSessionsRef.current, {
+          keepCompletionBanner: !autoStartNextPhase,
+          autoStart: autoStartNextPhase,
+        });
+      }, 1500);
+    }, 250);
+
+    return () => window.clearInterval(interval);
+  }, [advanceToNextPhase, clearPendingAdvance, getNextMode, isRunning, resetTickTracking, variant]);
+
   const startTimer = useCallback(() => {
     if (!activeSubject) return;
-    
-    // Request notification permission on first interaction
+
     const shouldRequestNotificationPermission = notificationSettingsRef.current.sessionEndNotification
       || notificationSettingsRef.current.breakEndNotification;
 
@@ -253,103 +302,70 @@ export function useTimer({
     }
 
     const hadPendingAdvance = Boolean(advanceTimeoutRef.current);
-
-    // Cancel any pending auto-advance if user starts manually
-    if (advanceTimeoutRef.current) {
-      clearTimeout(advanceTimeoutRef.current);
-      advanceTimeoutRef.current = null;
-    }
+    clearPendingAdvance();
+    resetTickTracking();
 
     if ((timerComplete || hadPendingAdvance) && timeLeft <= 0) {
       advanceToNextPhase(timerModeRef.current, completedSessionsRef.current, { autoStart: true });
       setLastCompletedMode(null);
       return;
     }
-    
+
     setTimerComplete(false);
     setLastCompletedMode(null);
     setIsPaused(false);
     setIsRunning(true);
-  }, [activeSubject, advanceToNextPhase, timeLeft, timerComplete]);
+  }, [activeSubject, advanceToNextPhase, clearPendingAdvance, resetTickTracking, timeLeft, timerComplete]);
 
-  /**
-   * Pause the timer. Time is preserved for resume.
-   * Only tracks time counted, not paused time.
-   */
   const pauseTimer = useCallback(() => {
+    clearPendingAdvance();
+    resetTickTracking();
     setIsRunning(false);
     setIsPaused(true);
-  }, []);
+  }, [clearPendingAdvance, resetTickTracking]);
 
-  /**
-   * Toggle between start/resume and pause.
-   */
   const toggleTimer = useCallback(() => {
     if (isRunning) {
       pauseTimer();
     } else {
       startTimer();
     }
-  }, [isRunning, startTimer, pauseTimer]);
+  }, [isRunning, pauseTimer, startTimer]);
 
-  /**
-   * Reset the current phase to its full duration.
-   */
   const resetTimer = useCallback(() => {
+    clearPendingAdvance();
+    resetTickTracking();
     setIsRunning(false);
     setIsPaused(false);
     setTimerComplete(false);
     setLastCompletedMode(null);
 
-    // Cancel any pending auto-advance
-    if (advanceTimeoutRef.current) {
-      clearTimeout(advanceTimeoutRef.current);
-      advanceTimeoutRef.current = null;
-    }
+    const nextDuration = getDurationForMode(timerModeRef.current);
+    setTimeLeft(nextDuration);
+    setTotalTimerSeconds(nextDuration);
+  }, [clearPendingAdvance, getDurationForMode, resetTickTracking]);
 
-    const newTime = getDurationForMode(timerModeRef.current);
-    setTimeLeft(newTime);
-    setTotalTimerSeconds(newTime);
-  }, [getDurationForMode]);
-
-  /**
-   * Switch to a specific mode (focus, shortBreak, longBreak).
-   * Resets the timer to the new mode's full duration.
-   */
   const changeMode = useCallback((mode) => {
+    clearPendingAdvance();
+    resetTickTracking();
     setIsRunning(false);
     setIsPaused(false);
     setTimerMode(mode);
     setTimerComplete(false);
     setLastCompletedMode(null);
 
-    // Cancel any pending auto-advance
-    if (advanceTimeoutRef.current) {
-      clearTimeout(advanceTimeoutRef.current);
-      advanceTimeoutRef.current = null;
-    }
+    const nextDuration = getDurationForMode(mode);
+    setTimeLeft(nextDuration);
+    setTotalTimerSeconds(nextDuration);
+  }, [clearPendingAdvance, getDurationForMode, resetTickTracking]);
 
-    const newTime = getDurationForMode(mode);
-    setTimeLeft(newTime);
-    setTotalTimerSeconds(newTime);
-  }, [getDurationForMode]);
-
-  /**
-   * Manually skip to the next phase.
-   * If skipping a focus session, it does NOT count as completed.
-   * If skipping a break, just moves to the next focus session.
-   */
   const skipToNextPhase = useCallback(() => {
+    clearPendingAdvance();
+    resetTickTracking();
     setIsRunning(false);
     setIsPaused(false);
     setTimerComplete(false);
     setLastCompletedMode(null);
-
-    // Cancel any pending auto-advance
-    if (advanceTimeoutRef.current) {
-      clearTimeout(advanceTimeoutRef.current);
-      advanceTimeoutRef.current = null;
-    }
 
     const currentMode = timerModeRef.current;
     const currentSessions = completedSessionsRef.current;
@@ -369,12 +385,11 @@ export function useTimer({
     }
 
     applyPhaseState(nextMode, nextSessions);
-  }, [applyPhaseState, getNextMode, variant]);
+  }, [applyPhaseState, clearPendingAdvance, getNextMode, resetTickTracking, variant]);
 
-  /**
-   * Reset the entire Pomodoro cycle (sessions counter + go back to focus).
-   */
   const resetCycle = useCallback(() => {
+    clearPendingAdvance();
+    resetTickTracking();
     setIsRunning(false);
     setIsPaused(false);
     setTimerComplete(false);
@@ -382,18 +397,11 @@ export function useTimer({
     setTimerMode('focus');
     setCompletedSessions(0);
 
-    // Cancel any pending auto-advance
-    if (advanceTimeoutRef.current) {
-      clearTimeout(advanceTimeoutRef.current);
-      advanceTimeoutRef.current = null;
-    }
+    const nextDuration = getDurationForMode('focus');
+    setTimeLeft(nextDuration);
+    setTotalTimerSeconds(nextDuration);
+  }, [clearPendingAdvance, getDurationForMode, resetTickTracking]);
 
-    const newTime = getDurationForMode('focus');
-    setTimeLeft(newTime);
-    setTotalTimerSeconds(newTime);
-  }, [getDurationForMode]);
-
-  // Timer theme based on mode (memoized to prevent unnecessary child re-renders)
   const timerTheme = useMemo(() => {
     if (timerMode === 'shortBreak') return {
       stroke: 'stroke-emerald-400', glow: 'shadow-emerald-500/30',
@@ -409,7 +417,6 @@ export function useTimer({
     };
   }, [timerMode]);
 
-  // Ring progress calculations
   const ringCircumference = 2 * Math.PI * 46;
   const safeTotalSeconds = totalTimerSeconds || 1;
   const ringProgress = ((safeTotalSeconds - timeLeft) / safeTotalSeconds) * 100;
@@ -432,6 +439,8 @@ export function useTimer({
     changeMode,
     skipToNextPhase,
     resetCycle,
+    restoreTimerState,
+    getTimerSnapshot,
     timerTheme,
     ringCircumference,
     ringOffset,

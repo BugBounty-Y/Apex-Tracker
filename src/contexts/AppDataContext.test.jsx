@@ -12,6 +12,17 @@ const timerMocks = vi.hoisted(() => ({
   changeMode: vi.fn(),
   skipToNextPhase: vi.fn(),
   resetCycle: vi.fn(),
+  restoreTimerState: vi.fn(),
+  getTimerSnapshot: vi.fn(() => ({
+    timerMode: 'focus',
+    timeLeft: 1500,
+    totalTimerSeconds: 1500,
+    isRunning: false,
+    isPaused: false,
+    timerComplete: false,
+    lastCompletedMode: null,
+    completedSessions: 0,
+  })),
 }));
 
 const loadOrMigrateUserDataMock = vi.fn();
@@ -52,6 +63,7 @@ vi.mock('../hooks/useTimer', () => ({
     longBreakMinutes: 15,
     sessionsBeforeLongBreak: 4,
     customFocusMinutes: 45,
+    autoStartBreaks: false,
   },
   useTimer: () => ({
     timerMode: 'focus',
@@ -69,6 +81,8 @@ vi.mock('../hooks/useTimer', () => ({
     changeMode: timerMocks.changeMode,
     skipToNextPhase: timerMocks.skipToNextPhase,
     resetCycle: timerMocks.resetCycle,
+    restoreTimerState: timerMocks.restoreTimerState,
+    getTimerSnapshot: timerMocks.getTimerSnapshot,
     timerTheme: {
       stroke: 'stroke-cyan-400',
       glow: 'shadow-cyan-500/30',
@@ -121,6 +135,7 @@ describe('AppDataProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     capturedContext = null;
+    localStorage.clear();
     authState = {
       user: { uid: 'user-1', displayName: 'Yahya' },
     };

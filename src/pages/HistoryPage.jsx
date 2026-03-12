@@ -5,6 +5,7 @@ import SectionCard from '../components/ui/SectionCard';
 import EmptyState from '../components/ui/EmptyState';
 import { useAppData } from '../contexts/AppDataContext';
 import { formatTimestampInTimeZone, getDateKeyInTimeZone } from '../utils/helpers';
+import { getStudySessionEndTimestamp, getStudySessionStartTimestamp } from '../utils/studyData';
 
 function formatDateTime(value, userTimezone) {
   return formatTimestampInTimeZone(value, userTimezone, 'ar', {
@@ -29,9 +30,16 @@ export default function HistoryPage() {
     const matchesStatus = statusFilter === 'all'
       || (statusFilter === 'completed' && session.completed)
       || (statusFilter === 'stopped' && !session.completed);
-    const sessionDateKey = getDateKeyInTimeZone(new Date(session.startedAt), appData.userProfile.timezone);
-    const matchesFrom = !fromDate || sessionDateKey >= fromDate;
-    const matchesTo = !toDate || sessionDateKey <= toDate;
+    const sessionStartMs = getStudySessionStartTimestamp(session);
+    const sessionEndMs = getStudySessionEndTimestamp(session);
+    if (!Number.isFinite(sessionStartMs)) return false;
+    const sessionStartKey = getDateKeyInTimeZone(new Date(sessionStartMs), appData.userProfile.timezone);
+    const sessionEndKey = getDateKeyInTimeZone(
+      new Date(Number.isFinite(sessionEndMs) ? sessionEndMs : sessionStartMs),
+      appData.userProfile.timezone,
+    );
+    const matchesFrom = !fromDate || sessionEndKey >= fromDate;
+    const matchesTo = !toDate || sessionStartKey <= toDate;
 
     return matchesSubject && matchesType && matchesStatus && matchesFrom && matchesTo;
   }), [

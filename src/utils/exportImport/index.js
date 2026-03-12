@@ -1,4 +1,23 @@
-import { createEmptyAppData, normalizeAppData } from '../appData';
+import { normalizeAppData } from '../appData';
+import { mergeAppDataSnapshots } from '../dataMerge';
+
+const APEX_BACKUP_APP_NAME = 'Apex Tracker';
+const KNOWN_APP_DATA_KEYS = [
+  'subjects',
+  'dailyLog',
+  'dailyGoal',
+  'studySessions',
+  'userProfile',
+  'pomodoroSettings',
+];
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function hasKnownAppDataKeys(value) {
+  return isPlainObject(value) && KNOWN_APP_DATA_KEYS.some((key) => key in value);
+}
 
 export function buildExportPayload(data) {
   const normalizedData = normalizeAppData(data);
@@ -17,59 +36,23 @@ export function exportDataAsJson(data) {
 
 export function parseImportedJson(rawJson, fallbackName = '') {
   const parsedValue = JSON.parse(rawJson);
-  const rawData = parsedValue?.data ?? parsedValue;
+  const isWrappedBackup = isPlainObject(parsedValue)
+    && parsedValue.app === APEX_BACKUP_APP_NAME
+    && Number.isFinite(Number(parsedValue.version))
+    && isPlainObject(parsedValue.data);
+
+  if (!isWrappedBackup && !hasKnownAppDataKeys(parsedValue)) {
+    throw new Error('INVALID_BACKUP_FILE');
+  }
+
+  const rawData = isWrappedBackup ? parsedValue.data : parsedValue;
 
   return normalizeAppData(rawData, fallbackName);
 }
 
 export function mergeImportedData(currentData, importedData) {
-  const normalizedCurrentData = normalizeAppData(currentData);
-  const normalizedImportedData = normalizeAppData(importedData);
-
-  const mergedSubjects = {
-    ...normalizedCurrentData.subjects,
-    ...normalizedImportedData.subjects,
-  };
-
-  const mergedDailyLog = {
-    ...normalizedCurrentData.dailyLog,
-    ...normalizedImportedData.dailyLog,
-  };
-
-  const existingSessionIds = new Set(normalizedCurrentData.studySessions.map((session) => session.id));
-  const mergedStudySessions = [
-    ...normalizedCurrentData.studySessions,
-    ...normalizedImportedData.studySessions.filter((session) => !existingSessionIds.has(session.id)),
-  ].sort((left, right) => new Date(right.startedAt).getTime() - new Date(left.startedAt).getTime());
-
-  return normalizeAppData({
-    ...createEmptyAppData(),
-    ...normalizedCurrentData,
-    ...normalizedImportedData,
-    subjects: mergedSubjects,
-    dailyLog: mergedDailyLog,
-    studySessions: mergedStudySessions,
-    userProfile: {
-      ...normalizedCurrentData.userProfile,
-      ...normalizedImportedData.userProfile,
-      goals: {
-        ...normalizedCurrentData.userProfile.goals,
-        ...normalizedImportedData.userProfile.goals,
-      },
-      notificationSettings: {
-        ...normalizedCurrentData.userProfile.notificationSettings,
-        ...normalizedImportedData.userProfile.notificationSettings,
-      },
-      badges: Array.from(new Set([
-        ...normalizedCurrentData.userProfile.badges,
-        ...normalizedImportedData.userProfile.badges,
-      ])),
-    },
-    dailyGoal: normalizedImportedData.dailyGoal || normalizedCurrentData.dailyGoal,
-    pomodoroSettings: {
-      ...normalizedCurrentData.pomodoroSettings,
-      ...normalizedImportedData.pomodoroSettings,
-    },
+  return mergeAppDataSnapshots(currentData, importedData, {
+    preferIncomingSettings: false,
   });
 }
 

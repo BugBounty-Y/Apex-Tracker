@@ -132,4 +132,32 @@ describe('useTimer', () => {
     expect(result.current.timerMode).toBe('focus');
     expect(result.current.completedSessions).toBe(0);
   });
+
+  it('does not round delayed ticks up to extra study seconds', () => {
+    const onTickFocus = vi.fn();
+
+    const { result } = renderHook(() => useTimer({
+      activeSubject: 'Math',
+      onTickFocus,
+      onSessionComplete: vi.fn(),
+      pomodoroSettings: {
+        focusMinutes: 10 / 60,
+        shortBreakMinutes: 1 / 60,
+        longBreakMinutes: 1 / 60,
+        sessionsBeforeLongBreak: 4,
+      },
+    }));
+
+    act(() => {
+      result.current.startTimer();
+      vi.advanceTimersByTime(1600);
+    });
+
+    const trackedSeconds = onTickFocus.mock.calls.reduce((total, [seconds]) => total + seconds, 0);
+
+    expect(trackedSeconds).toBeLessThanOrEqual(1);
+    expect(result.current.timeLeft).toBeGreaterThanOrEqual(9);
+    expect(result.current.timeLeft).toBeLessThanOrEqual(10);
+  });
+
 });

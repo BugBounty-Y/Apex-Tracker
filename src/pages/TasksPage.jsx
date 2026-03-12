@@ -184,7 +184,7 @@ function TaskRow({ task, subjectName, onToggle, onDelete }) {
 }
 
 /* ─── Subject Group Header ─── */
-function SubjectGroupHeader({ subjectName, openCount, doneCount, progressPercent }) {
+function SubjectGroupHeader({ subjectName, openCount, progressPercent }) {
   return (
     <div className="flex items-center justify-between gap-3 mb-2">
       <div className="flex items-center gap-2.5">
@@ -490,9 +490,8 @@ export default function TasksPage() {
               <SubjectGroupHeader
                 subjectName={group.subjectName}
                 openCount={group.tasks.filter((t) => !t.done).length}
-                doneCount={group.tasks.filter((t) => t.done).length}
-                progressPercent={group.progressPercent}
-              />
+                  progressPercent={group.progressPercent}
+                />
               <div className="space-y-2">
                 {/* Open tasks first */}
                 {group.tasks

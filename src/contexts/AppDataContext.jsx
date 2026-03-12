@@ -25,8 +25,18 @@ import {
 } from '../utils/storage';
 import { getHourInTimeZone, getTodayKey } from '../utils/helpers';
 import { DEFAULT_POMODORO_SETTINGS, useTimer } from '../hooks/useTimer';
-import { incrementDailyLogEntry, incrementSubjectSessions, incrementSubjectStudyTime } from '../utils/studyData';
+import {
+  getStudySessionStartTimestamp,
+  incrementDailyLogRange,
+  incrementSubjectStudyTime,
+  rebuildDailyLogFromSessions,
+} from '../utils/studyData';
 import { downloadJsonFile, exportDataAsJson, mergeImportedData, parseImportedJson } from '../utils/exportImport';
+import {
+  getDurationForTimerMode,
+  getNextTimerPhase,
+  shouldAutoStartNextPhase,
+} from '../utils/timerEngine';
 import {
   getDashboardSummary,
   getHeatmapData,
@@ -39,9 +49,45 @@ import { trackEvent } from '../utils/telemetry';
 
 const AppDataContext = createContext(null);
 const REMINDER_STORAGE_KEY_PREFIX = 'apex-tracker-reminder';
+const ACTIVE_STUDY_STORAGE_KEY_PREFIX = 'apex-tracker-active-study';
 
 function getReminderStorageKey(uid) {
   return `${REMINDER_STORAGE_KEY_PREFIX}:${uid || 'guest'}`;
+}
+
+function getActiveStudyStorageKey(uid) {
+  return `${ACTIVE_STUDY_STORAGE_KEY_PREFIX}:${uid || 'guest'}`;
+}
+
+function readStoredActiveStudyState(uid) {
+  if (!uid) return null;
+
+  try {
+    const rawValue = localStorage.getItem(getActiveStudyStorageKey(uid));
+    return rawValue ? JSON.parse(rawValue) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredActiveStudyState(uid, payload) {
+  if (!uid) return;
+
+  try {
+    localStorage.setItem(getActiveStudyStorageKey(uid), JSON.stringify(payload));
+  } catch {
+    // Ignore local storage write failures for volatile timer state.
+  }
+}
+
+function clearStoredActiveStudyState(uid) {
+  if (!uid) return;
+
+  try {
+    localStorage.removeItem(getActiveStudyStorageKey(uid));
+  } catch {
+    // Ignore local storage errors while clearing volatile timer state.
+  }
 }
 
 function getRandomSubjectColor() {
@@ -51,6 +97,16 @@ function getRandomSubjectColor() {
 
 function normalizeDataForUser(data, user) {
   return normalizeAppData(data, user?.displayName || '');
+}
+
+function getSessionDraftStartMs(sessionDraft) {
+  if (!sessionDraft) return NaN;
+
+  if (Number.isFinite(sessionDraft.startedAtMs)) {
+    return sessionDraft.startedAtMs;
+  }
+
+  return getStudySessionStartTimestamp(sessionDraft);
 }
 
 export function AppDataProvider({ children }) {
@@ -64,6 +120,7 @@ export function AppDataProvider({ children }) {
   const [activeSubject, setActiveSubjectState] = useState(null);
   const [activeTaskId, setActiveTaskId] = useState('');
   const [timerPreset, setTimerPreset] = useState('pomodoro');
+  const [restoredFocusTimerState, setRestoredFocusTimerState] = useState(null);
   const [stopwatchElapsed, setStopwatchElapsed] = useState(0);
   const [stopwatchRunning, setStopwatchRunning] = useState(false);
   const [stopwatchPaused, setStopwatchPaused] = useState(false);
@@ -77,6 +134,8 @@ export function AppDataProvider({ children }) {
   const saveInFlightRef = useRef(false);
   const saveQueuedRef = useRef(false);
   const savePromiseRef = useRef(null);
+  const stopwatchLastTickAtRef = useRef(null);
+  const stopwatchTickRemainderMsRef = useRef(0);
 
   useEffect(() => {
     latestDataRef.current = appData;
@@ -134,6 +193,276 @@ export function AppDataProvider({ children }) {
     return normalizedData;
   }, [user]);
 
+  const buildCompletedSessionData = useCallback((currentData, sessionDraft, completed, endedAt = new Date().toISOString()) => {
+    if (!sessionDraft || sessionDraft.durationSeconds <= 0) {
+      return { nextData: currentData, completedSession: null };
+    }
+
+    const persistableSessionDraft = { ...sessionDraft };
+    delete persistableSessionDraft.startedAtMs;
+    const completedSession = {
+      ...persistableSessionDraft,
+      endedAt,
+      completed,
+    };
+    const nextSubjects = { ...currentData.subjects };
+    const subjectToUpdate = nextSubjects[completedSession.subject];
+
+    if (subjectToUpdate) {
+      nextSubjects[completedSession.subject] = {
+        ...subjectToUpdate,
+        lastSessionAt: completedSession.endedAt,
+        lastTaskId: completedSession.taskId || subjectToUpdate.lastTaskId || '',
+        sessions: completed && completedSession.type !== 'stopwatch'
+          ? (subjectToUpdate.sessions || 0) + 1
+          : (subjectToUpdate.sessions || 0),
+      };
+    }
+
+    const nextBadges = new Set(currentData.userProfile.badges || []);
+    if (currentData.studySessions.length === 0) nextBadges.add('First session');
+    if (completed && calculateStreak(currentData.dailyLog, currentData.userProfile.timezone) >= 6) {
+      nextBadges.add('7-day streak');
+    }
+
+    const totalCompletedHours = Object.values(nextSubjects)
+      .reduce((total, subject) => total + ((subject.studiedSeconds || 0) / 3600), 0);
+    if (totalCompletedHours >= 50) nextBadges.add('50 hours');
+
+    return {
+      completedSession,
+      nextData: {
+        ...currentData,
+        subjects: nextSubjects,
+        studySessions: [completedSession, ...currentData.studySessions].slice(0, 800),
+        userProfile: {
+          ...currentData.userProfile,
+          badges: Array.from(nextBadges),
+        },
+      },
+    };
+  }, []);
+
+  const rebuildDailyLogForTimezone = useCallback((currentData, nextTimezone, sessionDraft = sessionDraftRef.current) => {
+    let rebuiltDailyLog = rebuildDailyLogFromSessions(currentData.studySessions, nextTimezone);
+
+    if (sessionDraft?.durationSeconds > 0) {
+      const sessionStartMs = getSessionDraftStartMs(sessionDraft);
+      if (Number.isFinite(sessionStartMs)) {
+        rebuiltDailyLog = incrementDailyLogRange(
+          rebuiltDailyLog,
+          sessionStartMs,
+          sessionDraft.durationSeconds,
+          nextTimezone,
+        );
+      }
+    }
+
+    return Object.keys(rebuiltDailyLog).length > 0 ? rebuiltDailyLog : currentData.dailyLog;
+  }, []);
+
+  const restorePersistedStudyState = useCallback((hydratedData, ownerUid) => {
+    const persistedState = readStoredActiveStudyState(ownerUid);
+    if (!persistedState) return null;
+
+    const persistedPreset = ['pomodoro', 'custom', 'stopwatch'].includes(persistedState.timerPreset)
+      ? persistedState.timerPreset
+      : 'pomodoro';
+    const selection = getValidSelection(
+      hydratedData.subjects,
+      persistedState.activeSubject,
+      persistedState.activeTaskId,
+    );
+
+    if (!selection.subject) {
+      clearStoredActiveStudyState(ownerUid);
+      return null;
+    }
+
+    const nowMs = Date.now();
+    const persistedAtMs = Number.parseInt(persistedState.persistedAt, 10);
+    const elapsedWhileAwaySeconds = Number.isFinite(persistedAtMs)
+      ? Math.max(0, Math.floor((nowMs - persistedAtMs) / 1000))
+      : 0;
+
+    let nextData = hydratedData;
+    let nextSessionDraft = persistedState.sessionDraft
+      ? {
+          ...persistedState.sessionDraft,
+          subject: selection.subject,
+        }
+      : null;
+
+    const selectedTask = hydratedData.subjects[selection.subject]?.tasks?.find((task) => task.id === selection.taskId) || null;
+    if (nextSessionDraft) {
+      nextSessionDraft.taskId = selectedTask?.id || nextSessionDraft.taskId || '';
+      nextSessionDraft.taskTitle = selectedTask?.title || nextSessionDraft.taskTitle || '';
+      nextSessionDraft.startedAtMs = getSessionDraftStartMs(nextSessionDraft);
+    }
+
+    const applyTrackedSeconds = (elapsedSeconds) => {
+      if (!nextSessionDraft || elapsedSeconds <= 0) {
+        return;
+      }
+
+      const sessionStartMs = getSessionDraftStartMs(nextSessionDraft);
+      if (!Number.isFinite(sessionStartMs)) {
+        return;
+      }
+
+      const rangeStart = sessionStartMs + (nextSessionDraft.durationSeconds * 1000);
+
+      nextData = {
+        ...nextData,
+        subjects: incrementSubjectStudyTime(nextData.subjects, nextSessionDraft.subject, elapsedSeconds),
+        dailyLog: incrementDailyLogRange(
+          nextData.dailyLog,
+          rangeStart,
+          elapsedSeconds,
+          nextData.userProfile.timezone,
+        ),
+      };
+      nextSessionDraft = {
+        ...nextSessionDraft,
+        durationSeconds: nextSessionDraft.durationSeconds + elapsedSeconds,
+      };
+    };
+
+    let nextFocusTimerState = null;
+    let nextStopwatchState = {
+      elapsedSeconds: 0,
+      isRunning: false,
+      isPaused: false,
+    };
+
+    if (persistedPreset === 'stopwatch') {
+      const persistedElapsedSeconds = Number.parseInt(
+        persistedState.stopwatch?.elapsedSeconds ?? persistedState.stopwatch?.elapsed ?? 0,
+        10,
+      ) || 0;
+      const wasRunning = Boolean(persistedState.stopwatch?.isRunning);
+      const wasPaused = Boolean(persistedState.stopwatch?.isPaused) && !wasRunning;
+      const catchUpSeconds = wasRunning ? elapsedWhileAwaySeconds : 0;
+
+      applyTrackedSeconds(catchUpSeconds);
+
+      nextStopwatchState = {
+        elapsedSeconds: persistedElapsedSeconds + catchUpSeconds,
+        isRunning: wasRunning && Boolean(nextSessionDraft),
+        isPaused: wasPaused || (wasRunning && !nextSessionDraft),
+      };
+    } else if (persistedState.focusTimer) {
+      const variant = persistedPreset === 'custom' ? 'focusOnly' : 'pomodoro';
+      const timerSettings = persistedPreset === 'custom'
+        ? {
+            ...hydratedData.pomodoroSettings,
+            focusMinutes: hydratedData.pomodoroSettings.customFocusMinutes || DEFAULT_POMODORO_SETTINGS.customFocusMinutes,
+          }
+        : hydratedData.pomodoroSettings;
+      let currentMode = ['focus', 'shortBreak', 'longBreak'].includes(persistedState.focusTimer.timerMode)
+        ? persistedState.focusTimer.timerMode
+        : 'focus';
+      let currentCompletedSessions = Number.parseInt(persistedState.focusTimer.completedSessions, 10) || 0;
+      let currentTotalTimerSeconds = Math.max(
+        1,
+        Number.parseInt(persistedState.focusTimer.totalTimerSeconds, 10)
+          || getDurationForTimerMode(currentMode, timerSettings),
+      );
+      let currentTimeLeft = Math.max(
+        0,
+        Math.min(
+          Number.parseInt(persistedState.focusTimer.timeLeft, 10) || currentTotalTimerSeconds,
+          currentTotalTimerSeconds,
+        ),
+      );
+      let isTimerRunning = Boolean(persistedState.focusTimer.isRunning);
+      let isTimerPaused = Boolean(persistedState.focusTimer.isPaused) && !isTimerRunning;
+      let remainingElapsedSeconds = isTimerRunning ? elapsedWhileAwaySeconds : 0;
+
+      if (!nextSessionDraft && currentMode === 'focus') {
+        const inferredDurationSeconds = Math.max(0, currentTotalTimerSeconds - currentTimeLeft);
+        const inferredStartedAtMs = nowMs - (inferredDurationSeconds * 1000);
+
+        nextSessionDraft = {
+          id: createId('session'),
+          subject: selection.subject,
+          taskId: selectedTask?.id || '',
+          taskTitle: selectedTask?.title || '',
+          startedAt: new Date(inferredStartedAtMs).toISOString(),
+          startedAtMs: inferredStartedAtMs,
+          durationSeconds: inferredDurationSeconds,
+          mode: persistedPreset,
+          type: persistedPreset === 'custom' ? 'custom' : 'focus',
+        };
+      }
+
+      while (isTimerRunning && remainingElapsedSeconds > 0) {
+        const consumedSeconds = Math.min(currentTimeLeft, remainingElapsedSeconds);
+
+        if (currentMode === 'focus') {
+          applyTrackedSeconds(consumedSeconds);
+        }
+
+        currentTimeLeft -= consumedSeconds;
+        remainingElapsedSeconds -= consumedSeconds;
+
+        if (currentTimeLeft > 0) {
+          break;
+        }
+
+        if (currentMode === 'focus' && nextSessionDraft?.durationSeconds > 0) {
+          const sessionEndIso = new Date(
+            getSessionDraftStartMs(nextSessionDraft) + (nextSessionDraft.durationSeconds * 1000),
+          ).toISOString();
+          const finalizedState = buildCompletedSessionData(nextData, nextSessionDraft, true, sessionEndIso);
+          nextData = finalizedState.nextData;
+          nextSessionDraft = null;
+        }
+
+        const nextPhase = getNextTimerPhase(
+          currentMode,
+          currentCompletedSessions,
+          timerSettings,
+          variant,
+        );
+        const previousMode = currentMode;
+
+        currentMode = nextPhase.mode;
+        currentCompletedSessions = nextPhase.sessions;
+        currentTotalTimerSeconds = getDurationForTimerMode(currentMode, timerSettings);
+        currentTimeLeft = currentTotalTimerSeconds;
+        isTimerRunning = shouldAutoStartNextPhase(previousMode, currentMode, timerSettings, variant);
+        isTimerPaused = false;
+
+        if (!isTimerRunning) {
+          break;
+        }
+      }
+
+      nextFocusTimerState = {
+        restorationKey: `${ownerUid}-${nowMs}`,
+        timerMode: currentMode,
+        completedSessions: currentCompletedSessions,
+        totalTimerSeconds: currentTotalTimerSeconds,
+        timeLeft: currentTimeLeft,
+        isRunning: isTimerRunning && currentTimeLeft > 0,
+        isPaused: isTimerPaused && currentTimeLeft > 0,
+        timerComplete: false,
+        lastCompletedMode: null,
+      };
+    }
+
+    return {
+      nextData,
+      activeSubject: selection.subject,
+      activeTaskId: selection.taskId,
+      timerPreset: persistedPreset,
+      focusTimerState: nextFocusTimerState,
+      stopwatchState: nextStopwatchState,
+      sessionDraft: nextSessionDraft,
+    };
+  }, [buildCompletedSessionData]);
+
   useEffect(() => {
     if (!user) {
       const emptyData = createEmptyAppData();
@@ -151,10 +480,15 @@ export function AppDataProvider({ children }) {
       setActiveTaskId('');
       setLoading(false);
       setSyncStatus('saved');
+      setRestoredFocusTimerState(null);
+      setTimerPreset('pomodoro');
       setStopwatchElapsed(0);
       setStopwatchRunning(false);
       setStopwatchPaused(false);
+      stopwatchLastTickAtRef.current = null;
+      stopwatchTickRemainderMsRef.current = 0;
       sessionDraftRef.current = null;
+      clearStoredActiveStudyState(user?.uid);
       return;
     }
 
@@ -165,8 +499,21 @@ export function AppDataProvider({ children }) {
       if (cancelled) return;
 
       const normalizedData = normalizeDataForUser(loadedData || createEmptyAppData(user.displayName || ''), user);
+      const restoredState = restorePersistedStudyState(normalizedData, user.uid);
+      const hydratedData = restoredState?.nextData || normalizedData;
 
-      commitDataSnapshot(normalizedData, { preferredTaskId: '' });
+      commitDataSnapshot(hydratedData, {
+        preferredSubject: restoredState?.activeSubject || null,
+        preferredTaskId: restoredState?.activeTaskId || '',
+      });
+      sessionDraftRef.current = restoredState?.sessionDraft || null;
+      setTimerPreset(restoredState?.timerPreset || 'pomodoro');
+      setRestoredFocusTimerState(restoredState?.focusTimerState || null);
+      setStopwatchElapsed(restoredState?.stopwatchState?.elapsedSeconds || 0);
+      setStopwatchRunning(Boolean(restoredState?.stopwatchState?.isRunning));
+      setStopwatchPaused(Boolean(restoredState?.stopwatchState?.isPaused));
+      stopwatchLastTickAtRef.current = null;
+      stopwatchTickRemainderMsRef.current = 0;
       setLoading(false);
       setSyncStatus(navigator.onLine ? 'saved' : 'offline');
     });
@@ -174,7 +521,7 @@ export function AppDataProvider({ children }) {
     return () => {
       cancelled = true;
     };
-  }, [commitDataSnapshot, user]);
+  }, [commitDataSnapshot, restorePersistedStudyState, user]);
 
   const currentSubject = activeSubject ? appData.subjects[activeSubject] : null;
   const currentTask = currentSubject?.tasks?.find((task) => task.id === activeTaskId) || null;
@@ -189,20 +536,22 @@ export function AppDataProvider({ children }) {
     if (!activeSubject || sessionDraftRef.current) return;
 
     const task = latestDataRef.current.subjects[activeSubject]?.tasks?.find((item) => item.id === activeTaskId) || null;
+    const startedAtMs = Date.now();
 
     sessionDraftRef.current = {
       id: createId('session'),
       subject: activeSubject,
       taskId: task?.id || '',
       taskTitle: task?.title || '',
-      startedAt: new Date().toISOString(),
+      startedAt: new Date(startedAtMs).toISOString(),
+      startedAtMs,
       durationSeconds: 0,
       mode,
       type: mode === 'stopwatch' ? 'stopwatch' : mode === 'custom' ? 'custom' : 'focus',
     };
   }, [activeSubject, activeTaskId]);
 
-  const finalizeTrackedSession = useCallback((completed) => {
+  const finalizeTrackedSession = useCallback((completed, options = {}) => {
     const sessionDraft = sessionDraftRef.current;
     sessionDraftRef.current = null;
 
@@ -210,42 +559,22 @@ export function AppDataProvider({ children }) {
       return null;
     }
 
-    const completedSession = {
-      ...sessionDraft,
-      endedAt: new Date().toISOString(),
-      completed,
-    };
+    let completedSession = null;
 
     updateData((currentData) => {
-      const nextSubjects = { ...currentData.subjects };
-      const subjectToUpdate = nextSubjects[completedSession.subject];
-
-      if (subjectToUpdate) {
-        nextSubjects[completedSession.subject] = {
-          ...subjectToUpdate,
-          lastSessionAt: completedSession.endedAt,
-          lastTaskId: completedSession.taskId || subjectToUpdate.lastTaskId || '',
-        };
-      }
-
-      const nextBadges = new Set(currentData.userProfile.badges || []);
-      if (currentData.studySessions.length === 0) nextBadges.add('First session');
-      if (completed && streak >= 6) nextBadges.add('7-day streak');
-
-      const totalCompletedHours = Object.values(nextSubjects)
-        .reduce((total, subject) => total + ((subject.studiedSeconds || 0) / 3600), 0);
-      if (totalCompletedHours >= 50) nextBadges.add('50 hours');
-
-      return {
-        ...currentData,
-        subjects: nextSubjects,
-        studySessions: [completedSession, ...currentData.studySessions].slice(0, 800),
-        userProfile: {
-          ...currentData.userProfile,
-          badges: Array.from(nextBadges),
-        },
-      };
+      const finalizedState = buildCompletedSessionData(
+        currentData,
+        sessionDraft,
+        completed,
+        options.endedAt || new Date().toISOString(),
+      );
+      completedSession = finalizedState.completedSession;
+      return finalizedState.nextData;
     });
+
+    if (!completedSession) {
+      return null;
+    }
 
     trackEvent('study_session_recorded', {
       subject: completedSession.subject,
@@ -255,31 +584,36 @@ export function AppDataProvider({ children }) {
     });
 
     return completedSession;
-  }, [streak, updateData]);
+  }, [buildCompletedSessionData, updateData]);
 
   const onTickFocus = useCallback((elapsed = 1) => {
-    if (!elapsed || elapsed <= 0 || !activeSubject) return;
+    if (!elapsed || elapsed <= 0 || !activeSubjectRef.current) return;
 
-    const currentTodayKey = getTodayKey(latestDataRef.current.userProfile.timezone);
+    const subjectName = activeSubjectRef.current;
+    const sessionDraft = sessionDraftRef.current;
+    const sessionStartMs = getSessionDraftStartMs(sessionDraft);
+    const rangeStart = Number.isFinite(sessionStartMs)
+      ? sessionStartMs + ((sessionDraft?.durationSeconds || 0) * 1000)
+      : Date.now() - (elapsed * 1000);
 
     updateData((currentData) => ({
       ...currentData,
-      subjects: incrementSubjectStudyTime(currentData.subjects, activeSubject, elapsed),
-      dailyLog: incrementDailyLogEntry(currentData.dailyLog, currentTodayKey, elapsed),
+      subjects: incrementSubjectStudyTime(currentData.subjects, subjectName, elapsed),
+      dailyLog: incrementDailyLogRange(
+        currentData.dailyLog,
+        rangeStart,
+        elapsed,
+        currentData.userProfile.timezone,
+      ),
     }));
 
     if (sessionDraftRef.current) {
       sessionDraftRef.current.durationSeconds += elapsed;
     }
-  }, [activeSubject, updateData]);
+  }, [updateData]);
 
   const onSessionComplete = useCallback(() => {
     if (!activeSubject) return;
-
-    updateData((currentData) => ({
-      ...currentData,
-      subjects: incrementSubjectSessions(currentData.subjects, activeSubject),
-    }));
 
     const completedSession = finalizeTrackedSession(true);
     if (completedSession) {
@@ -289,7 +623,7 @@ export function AppDataProvider({ children }) {
         description: `${completedSession.subject} · ${Math.round(completedSession.durationSeconds / 60)} دقيقة`,
       });
     }
-  }, [activeSubject, finalizeTrackedSession, showToast, updateData]);
+  }, [activeSubject, finalizeTrackedSession, showToast]);
 
   const effectivePomodoroSettings = useMemo(() => (
     timerPreset === 'custom'
@@ -307,28 +641,39 @@ export function AppDataProvider({ children }) {
     pomodoroSettings: effectivePomodoroSettings,
     notificationSettings: appData.userProfile.notificationSettings,
     variant: timerPreset === 'custom' ? 'focusOnly' : 'pomodoro',
+    restoredState: restoredFocusTimerState,
   });
 
   useEffect(() => {
-    if (timerPreset !== 'stopwatch' || !stopwatchRunning) return undefined;
+    if (timerPreset !== 'stopwatch' || !stopwatchRunning) {
+      stopwatchLastTickAtRef.current = null;
+      stopwatchTickRemainderMsRef.current = 0;
+      return undefined;
+    }
 
-    let lastTickAt = Date.now();
+    stopwatchLastTickAtRef.current = Date.now();
 
     const interval = window.setInterval(() => {
       const now = Date.now();
-      const elapsedSeconds = Math.max(0, Math.round((now - lastTickAt) / 1000));
+      const previousTickTimestamp = stopwatchLastTickAtRef.current ?? now;
+      const elapsedMs = Math.max(0, now - previousTickTimestamp) + stopwatchTickRemainderMsRef.current;
+      const elapsedSeconds = Math.floor(elapsedMs / 1000);
+
+      stopwatchLastTickAtRef.current = now;
+      stopwatchTickRemainderMsRef.current = elapsedMs % 1000;
 
       if (elapsedSeconds > 0) {
         setStopwatchElapsed((currentValue) => currentValue + elapsedSeconds);
         onTickFocus(elapsedSeconds);
-        lastTickAt = now;
       }
-    }, 1000);
+    }, 250);
 
     return () => window.clearInterval(interval);
   }, [onTickFocus, stopwatchRunning, timerPreset]);
 
   const resetStopwatchState = useCallback(() => {
+    stopwatchLastTickAtRef.current = null;
+    stopwatchTickRemainderMsRef.current = 0;
     setStopwatchElapsed(0);
     setStopwatchRunning(false);
     setStopwatchPaused(false);
@@ -347,8 +692,10 @@ export function AppDataProvider({ children }) {
 
   const clearTransientStudyState = useCallback((options = {}) => {
     sessionDraftRef.current = null;
+    setRestoredFocusTimerState(null);
+    clearStoredActiveStudyState(user?.uid);
     resetTimerEngines(options);
-  }, [resetTimerEngines]);
+  }, [resetTimerEngines, user?.uid]);
 
   useEffect(() => {
     const nextSelection = getValidSelection(appData.subjects, activeSubject, activeTaskId);
@@ -371,6 +718,22 @@ export function AppDataProvider({ children }) {
       setActiveTaskId(nextSelection.taskId);
     }
   }, [activeSubject, activeTaskId, appData.subjects, clearTransientStudyState]);
+
+  useEffect(() => {
+    if (!sessionDraftRef.current || sessionDraftRef.current.subject !== activeSubject) {
+      return;
+    }
+
+    const task = activeSubject
+      ? appData.subjects[activeSubject]?.tasks?.find((item) => item.id === activeTaskId) || null
+      : null;
+
+    sessionDraftRef.current = {
+      ...sessionDraftRef.current,
+      taskId: task?.id || '',
+      taskTitle: task?.title || '',
+    };
+  }, [activeSubject, activeTaskId, appData.subjects]);
 
   const hasTrackedSessionInProgress = Boolean(sessionDraftRef.current);
 
@@ -445,6 +808,8 @@ export function AppDataProvider({ children }) {
 
   const pauseTimer = useCallback(() => {
     if (timerPreset === 'stopwatch') {
+      stopwatchLastTickAtRef.current = null;
+      stopwatchTickRemainderMsRef.current = 0;
       setStopwatchRunning(false);
       setStopwatchPaused(true);
       return;
@@ -507,6 +872,7 @@ export function AppDataProvider({ children }) {
 
     focusTimer.resetCycle();
     resetStopwatchState();
+    setRestoredFocusTimerState(null);
     setTimerPreset(nextPreset);
   }, [focusTimer, hasTrackedSessionInProgress, resetStopwatchState, stopActiveStudySession, timerPreset]);
 
@@ -561,6 +927,66 @@ export function AppDataProvider({ children }) {
     stopwatchRunning,
     timerPreset,
     toggleTimer,
+  ]);
+
+  const persistActiveStudyState = useCallback(() => {
+    if (!user?.uid || loading) return;
+
+    const hasStopwatchState = timerPreset === 'stopwatch' && (
+      stopwatchRunning
+      || stopwatchPaused
+      || stopwatchElapsed > 0
+    );
+    const hasFocusState = timerPreset !== 'stopwatch' && (
+      focusTimer.isRunning
+      || focusTimer.isPaused
+      || focusTimer.timerComplete
+      || focusTimer.timerMode !== 'focus'
+      || focusTimer.completedSessions > 0
+      || focusTimer.timeLeft !== focusTimer.totalTimerSeconds
+    );
+    const shouldPersist = Boolean(sessionDraftRef.current) || hasStopwatchState || hasFocusState;
+
+    if (!shouldPersist) {
+      clearStoredActiveStudyState(user.uid);
+      return;
+    }
+
+    writeStoredActiveStudyState(user.uid, {
+      version: 1,
+      persistedAt: Date.now(),
+      activeSubject: activeSubjectRef.current,
+      activeTaskId: activeTaskIdRef.current,
+      timerPreset,
+      sessionDraft: sessionDraftRef.current,
+      focusTimer: timerPreset === 'stopwatch' ? null : focusTimer.getTimerSnapshot(),
+      stopwatch: {
+        elapsedSeconds: stopwatchElapsed,
+        isRunning: stopwatchRunning,
+        isPaused: stopwatchPaused,
+      },
+    });
+  }, [
+    focusTimer,
+    loading,
+    stopwatchElapsed,
+    stopwatchPaused,
+    stopwatchRunning,
+    timerPreset,
+    user?.uid,
+  ]);
+
+  useEffect(() => {
+    persistActiveStudyState();
+  }, [
+    activeSubject,
+    activeTaskId,
+    focusTimer,
+    persistActiveStudyState,
+    stopwatchElapsed,
+    stopwatchPaused,
+    stopwatchRunning,
+    timerPreset,
   ]);
 
   const clearScheduledSave = useCallback(() => {
@@ -672,6 +1098,7 @@ export function AppDataProvider({ children }) {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden' && !window.isClearingData && user?.uid) {
+        persistActiveStudyState();
         latestSnapshotRef.current = saveData(latestDataRef.current, user.uid);
         flushCloudSave();
       }
@@ -679,6 +1106,7 @@ export function AppDataProvider({ children }) {
 
     const handleBeforeUnload = () => {
       if (window.isClearingData || !user?.uid) return;
+      persistActiveStudyState();
       latestSnapshotRef.current = saveData(latestDataRef.current, user.uid);
       flushCloudSave();
     };
@@ -690,7 +1118,7 @@ export function AppDataProvider({ children }) {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [flushCloudSave, user?.uid]);
+  }, [flushCloudSave, persistActiveStudyState, user?.uid]);
 
   useEffect(() => {
     if (!user?.uid) return undefined;
@@ -867,14 +1295,21 @@ export function AppDataProvider({ children }) {
   }, [activeTaskId, updateData]);
 
   const updateProfile = useCallback((profileChanges) => {
-    updateData((currentData) => ({
-      ...currentData,
-      userProfile: {
-        ...currentData.userProfile,
-        ...profileChanges,
-      },
-    }));
-  }, [updateData]);
+    updateData((currentData) => {
+      const nextTimezone = profileChanges.timezone || currentData.userProfile.timezone;
+
+      return {
+        ...currentData,
+        dailyLog: nextTimezone !== currentData.userProfile.timezone
+          ? rebuildDailyLogForTimezone(currentData, nextTimezone)
+          : currentData.dailyLog,
+        userProfile: {
+          ...currentData.userProfile,
+          ...profileChanges,
+        },
+      };
+    });
+  }, [rebuildDailyLogForTimezone, updateData]);
 
   const updateGoals = useCallback((goalChanges) => {
     updateData((currentData) => ({

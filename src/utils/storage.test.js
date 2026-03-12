@@ -47,7 +47,7 @@ describe('storage utilities', () => {
     expect(cachedSnapshot.subjects.Math.studiedSeconds).toBe(3600);
   });
 
-  it('prefers the newest snapshot during merge', async () => {
+  it('merges local and cloud snapshots instead of discarding one side', async () => {
     saveData({
       subjects: {
         Local: { goalHours: 5, studiedSeconds: 900, sessions: 1, color: 'bg-green-50 text-green-900' },
@@ -76,7 +76,7 @@ describe('storage utilities', () => {
     const result = await loadOrMigrateUserData('user-1');
 
     expect(result.subjects.Local).toBeDefined();
-    expect(result.subjects.Cloud).toBeUndefined();
+    expect(result.subjects.Cloud).toBeDefined();
   });
 
   it('calculates streaks from civil date keys even across DST periods', () => {

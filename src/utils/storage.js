@@ -5,6 +5,7 @@
 import { deleteDoc, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { getTodayKey, shiftDateKey } from './helpers';
 import { normalizeAppData } from './appData';
+import { mergeAppDataSnapshots } from './dataMerge';
 import { db } from '../firebase';
 
 const STORAGE_KEY_PREFIX = 'apex-tracker-data';
@@ -166,7 +167,16 @@ export async function loadUserData(uid) {
 
 export function resolvePreferredUserData(localData, firestoreData) {
   if (localData && firestoreData) {
-    return localData.updatedAt > firestoreData.updatedAt ? localData : firestoreData;
+    const preferFirestore = firestoreData.updatedAt >= localData.updatedAt;
+    const mergedAppData = preferFirestore
+      ? mergeAppDataSnapshots(localData, firestoreData, { preferIncomingSettings: true })
+      : mergeAppDataSnapshots(firestoreData, localData, { preferIncomingSettings: true });
+
+    return {
+      ...mergedAppData,
+      ownerUid: localData.ownerUid || firestoreData.ownerUid || null,
+      updatedAt: Math.max(localData.updatedAt || 0, firestoreData.updatedAt || 0),
+    };
   }
 
   return firestoreData || localData || null;
@@ -179,18 +189,37 @@ export function resolvePreferredUserData(localData, firestoreData) {
 export async function saveUserData(uid, data) {
   if (!uid || !data) return false;
 
-  const snapshot = createPersistedSnapshot(data, uid);
+  const localSnapshot = createPersistedSnapshot(data, uid);
+  const docRef = doc(db, 'users', uid);
+  let snapshotToSave = localSnapshot;
 
   try {
-    await setDoc(doc(db, 'users', uid), {
-      subjects: snapshot.subjects,
-      dailyLog: snapshot.dailyLog,
-      dailyGoal: snapshot.dailyGoal,
-      studySessions: snapshot.studySessions,
-      userProfile: snapshot.userProfile,
-      pomodoroSettings: snapshot.pomodoroSettings,
+    const existingSnapshot = await getDoc(docRef);
+    if (existingSnapshot.exists()) {
+      const remoteSnapshot = normalizePersistedData(existingSnapshot.data(), uid, 0);
+      if (remoteSnapshot) {
+        const preferIncomingSettings = localSnapshot.updatedAt >= remoteSnapshot.updatedAt;
+        snapshotToSave = {
+          ...mergeAppDataSnapshots(remoteSnapshot, localSnapshot, { preferIncomingSettings }),
+          ownerUid: uid,
+          updatedAt: Date.now(),
+        };
+      }
+    }
+  } catch {
+    snapshotToSave = localSnapshot;
+  }
+
+  try {
+    await setDoc(docRef, {
+      subjects: snapshotToSave.subjects,
+      dailyLog: snapshotToSave.dailyLog,
+      dailyGoal: snapshotToSave.dailyGoal,
+      studySessions: snapshotToSave.studySessions,
+      userProfile: snapshotToSave.userProfile,
+      pomodoroSettings: snapshotToSave.pomodoroSettings,
       ownerUid: uid,
-      updatedAtMs: snapshot.updatedAt,
+      updatedAtMs: snapshotToSave.updatedAt,
       updatedAt: serverTimestamp(),
     });
 

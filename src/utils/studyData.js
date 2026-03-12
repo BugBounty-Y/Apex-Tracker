@@ -41,6 +41,38 @@ function toTimestampMs(value) {
   return Number.isNaN(parsedValue.getTime()) ? NaN : parsedValue.getTime();
 }
 
+export function getStudySessionStartTimestamp(session) {
+  const directStartTimestamp = toTimestampMs(session?.startedAt);
+  if (Number.isFinite(directStartTimestamp)) {
+    return directStartTimestamp;
+  }
+
+  const endTimestamp = toTimestampMs(session?.endedAt);
+  const durationSeconds = Number.parseInt(session?.durationSeconds, 10);
+
+  if (Number.isFinite(endTimestamp) && Number.isFinite(durationSeconds) && durationSeconds > 0) {
+    return endTimestamp - (durationSeconds * 1000);
+  }
+
+  return NaN;
+}
+
+export function getStudySessionEndTimestamp(session) {
+  const directEndTimestamp = toTimestampMs(session?.endedAt);
+  if (Number.isFinite(directEndTimestamp)) {
+    return directEndTimestamp;
+  }
+
+  const startTimestamp = getStudySessionStartTimestamp(session);
+  const durationSeconds = Number.parseInt(session?.durationSeconds, 10);
+
+  if (Number.isFinite(startTimestamp) && Number.isFinite(durationSeconds) && durationSeconds > 0) {
+    return startTimestamp + (durationSeconds * 1000);
+  }
+
+  return NaN;
+}
+
 export function incrementDailyLogRange(
   dailyLog,
   rangeStart,
@@ -63,6 +95,19 @@ export function incrementDailyLogRange(
   }
 
   return nextDailyLog;
+}
+
+export function rebuildDailyLogFromSessions(studySessions = [], userTimezone = 'auto') {
+  return studySessions.reduce((dailyLog, session) => {
+    const durationSeconds = Number.parseInt(session?.durationSeconds, 10);
+    const startTimestamp = getStudySessionStartTimestamp(session);
+
+    if (!Number.isFinite(startTimestamp) || !Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+      return dailyLog;
+    }
+
+    return incrementDailyLogRange(dailyLog, startTimestamp, durationSeconds, userTimezone);
+  }, {});
 }
 
 export function incrementSubjectSessions(subjects, activeSubject) {

@@ -114,6 +114,7 @@ export default function SettingsPage() {
     longBreakMinutes: 15,
     sessionsBeforeLongBreak: 4,
     customFocusMinutes: 45,
+    autoStartBreaks: false,
   });
   const [notificationForm, setNotificationForm] = useState({
     soundEnabled: true,
@@ -140,6 +141,7 @@ export default function SettingsPage() {
       longBreakMinutes: appData.pomodoroSettings.longBreakMinutes,
       sessionsBeforeLongBreak: appData.pomodoroSettings.sessionsBeforeLongBreak,
       customFocusMinutes: appData.pomodoroSettings.customFocusMinutes,
+      autoStartBreaks: appData.pomodoroSettings.autoStartBreaks,
     });
     setNotificationForm({
       soundEnabled: appData.userProfile.notificationSettings.soundEnabled,
@@ -194,6 +196,7 @@ export default function SettingsPage() {
       longBreakMinutes: Number.parseInt(pomodoroForm.longBreakMinutes, 10) || 15,
       sessionsBeforeLongBreak: Number.parseInt(pomodoroForm.sessionsBeforeLongBreak, 10) || 4,
       customFocusMinutes: Number.parseInt(pomodoroForm.customFocusMinutes, 10) || 45,
+      autoStartBreaks: pomodoroForm.autoStartBreaks,
     });
     showToast({
       tone: 'success',
