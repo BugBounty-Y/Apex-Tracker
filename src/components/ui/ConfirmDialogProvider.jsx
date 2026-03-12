@@ -47,7 +47,8 @@ export function ConfirmDialogProvider({ children }) {
       {children}
       {dialogState && (
         <div
-          className="fixed inset-0 z-[95] flex items-center justify-center bg-black/55 px-4 backdrop-blur-sm animate-fade-in"
+          className="fixed inset-0 z-[95] flex items-center justify-center px-4 animate-fade-in"
+          style={{ backgroundColor: 'var(--c-overlay)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
           onClick={(event) => {
             if (event.target === event.currentTarget) {
               handleClose(false);
@@ -56,19 +57,19 @@ export function ConfirmDialogProvider({ children }) {
           role="presentation"
         >
           <div
-            className="w-full max-w-md rounded-2xl border p-6 shadow-2xl animate-slide-up"
-            style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', color: 'var(--c-text)' }}
+            className="w-full max-w-md rounded-[var(--radius-card)] border p-6 animate-slide-up"
+            style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', color: 'var(--c-text)', boxShadow: 'var(--shadow-elevated)' }}
             role="dialog"
             aria-modal="true"
             aria-labelledby="confirm-dialog-title"
           >
             <div className="flex items-start gap-4">
-              <div className="rounded-xl p-3 shrink-0" style={{ backgroundColor: `${tone.accent}15`, color: tone.accent }}>
+              <div className="rounded-[var(--radius-md)] p-3 shrink-0" style={{ backgroundColor: `${tone.accent}12`, color: tone.accent }}>
                 {tone.icon}
               </div>
               <div className="flex-1 text-right min-w-0">
                 <h3 id="confirm-dialog-title" className="text-base font-bold">{dialogState.title}</h3>
-                <p className="mt-2 text-[13px] leading-6" style={{ color: 'var(--c-text-muted)' }}>
+                <p className="mt-1.5 text-[13px] leading-6" style={{ color: 'var(--c-text-muted)' }}>
                   {dialogState.description}
                 </p>
               </div>
@@ -78,15 +79,14 @@ export function ConfirmDialogProvider({ children }) {
               <button
                 type="button"
                 onClick={() => handleClose(false)}
-                className="rounded-xl px-4 py-2.5 text-[13px] font-semibold transition-colors"
-                style={{ backgroundColor: 'var(--c-elevated)', color: 'var(--c-text-muted)' }}
+                className="app-btn-secondary"
               >
                 {dialogState.cancelLabel}
               </button>
               <button
                 type="button"
                 onClick={() => handleClose(true)}
-                className={`rounded-xl px-4 py-2.5 text-[13px] font-semibold text-white transition-colors ${tone.buttonClass}`}
+                className={`rounded-[var(--radius-btn)] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors ${tone.buttonClass}`}
               >
                 {dialogState.confirmLabel}
               </button>

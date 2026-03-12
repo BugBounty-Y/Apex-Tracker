@@ -48,12 +48,13 @@ export default function TimerPage() {
           description="من الأفضل تحديد المادة والمهمة أولًا حتى تُسجَّل الجلسات بشكل واضح في History وInsights."
         />
       ) : (
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_336px]">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
           {/* Timer display section */}
-          <section className="app-panel rounded-[24px] p-4 md:p-6">
+          <section className="app-panel rounded-[var(--radius-card)] p-5 md:p-7">
             <div className="text-center">
               {/* Active subject badge */}
-              <div className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[12px] font-bold"
+              <div
+                className="inline-flex items-center gap-2 app-chip"
                 style={{ backgroundColor: 'var(--c-accent-soft)', color: 'var(--c-nav-active)' }}
               >
                 <Icons.Book />
@@ -64,20 +65,26 @@ export default function TimerPage() {
               </div>
 
               {/* Timer circle */}
-              <div className="mx-auto mt-5 flex items-center justify-center rounded-full border"
+              <div
+                className="mx-auto mt-6 flex items-center justify-center rounded-full border-2"
                 style={{
-                  height: 'min(70vw, 280px)',
-                  width: 'min(70vw, 280px)',
-                  borderColor: timerState.isRunning ? 'rgba(139, 92, 246, 0.3)' : 'rgba(139, 92, 246, 0.15)',
+                  height: 'min(65vw, 260px)',
+                  width: 'min(65vw, 260px)',
+                  borderColor: timerState.isRunning ? 'rgba(139, 92, 246, 0.25)' : 'var(--c-border)',
                   background: timerState.isRunning
-                    ? 'radial-gradient(circle, rgba(139, 92, 246, 0.15), transparent 65%)'
-                    : 'radial-gradient(circle, rgba(139, 92, 246, 0.08), transparent 60%)',
-                  transition: 'all 0.5s ease',
+                    ? 'radial-gradient(circle, rgba(139, 92, 246, 0.10), transparent 60%)'
+                    : 'radial-gradient(circle, var(--c-surface-alt), transparent 60%)',
+                  transition: 'all 0.5s var(--ease-out)',
                 }}
               >
                 <div>
-                  <div className="text-[46px] font-bold tracking-tight tabular-nums md:text-[60px] leading-none">{displayValue}</div>
-                  <div className="mt-2 text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--c-text-faint)' }}>
+                  <div
+                    className="text-[42px] font-bold tracking-tight tabular-nums md:text-[56px] leading-none"
+                    style={{ letterSpacing: '-0.03em' }}
+                  >
+                    {displayValue}
+                  </div>
+                  <div className="mt-2 app-label text-center" style={{ fontSize: '0.625rem', marginBottom: 0 }}>
                     {timerPreset === 'stopwatch'
                       ? 'Count up'
                       : timerState.timerMode === 'focus'
@@ -91,7 +98,8 @@ export default function TimerPage() {
 
               {/* Completion message */}
               {timerState.timerComplete && (
-                <div className="mt-4 inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[12px] font-bold"
+                <div
+                  className="mt-4 inline-flex items-center gap-2 app-chip"
                   style={{ backgroundColor: 'var(--c-success-soft)', color: 'var(--c-success)' }}
                 >
                   <Icons.CheckCircle />
@@ -100,11 +108,11 @@ export default function TimerPage() {
               )}
 
               {/* Action buttons */}
-              <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5">
                 <button
                   type="button"
                   onClick={timerState.toggleTimer}
-                  className="app-btn-primary px-5"
+                  className="app-btn-primary px-6"
                 >
                   {timerState.isRunning ? <Icons.Pause /> : <Icons.PlaySmall />}
                   {timerState.isRunning ? 'Pause' : timerState.isPaused ? 'Resume' : 'Start'}
@@ -126,18 +134,18 @@ export default function TimerPage() {
               </div>
 
               {/* Quick stats */}
-              <div className="mt-5 grid gap-2.5 md:grid-cols-3">
-                <div className="rounded-[18px] border p-3" style={{ backgroundColor: 'var(--c-surface-alt)', borderColor: 'var(--c-border)' }}>
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--c-text-faint)' }}>النمط</div>
-                  <div className="mt-1 text-[14px] font-bold">{timerPresets.find((preset) => preset.id === timerPreset)?.label}</div>
+              <div className="mt-6 grid gap-2.5 md:grid-cols-3">
+                <div className="rounded-[var(--radius-md)] p-3" style={{ backgroundColor: 'var(--c-surface-alt)' }}>
+                  <div className="app-label mb-0" style={{ fontSize: '0.625rem' }}>النمط</div>
+                  <div className="mt-1 text-[13px] font-bold">{timerPresets.find((preset) => preset.id === timerPreset)?.label}</div>
                 </div>
-                <div className="rounded-[18px] border p-3" style={{ backgroundColor: 'var(--c-surface-alt)', borderColor: 'var(--c-border)' }}>
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--c-text-faint)' }}>المنجز</div>
-                  <div className="mt-1 text-[14px] font-bold">{formatHoursMins(currentSubject?.studiedSeconds || 0)}</div>
+                <div className="rounded-[var(--radius-md)] p-3" style={{ backgroundColor: 'var(--c-surface-alt)' }}>
+                  <div className="app-label mb-0" style={{ fontSize: '0.625rem' }}>المنجز</div>
+                  <div className="mt-1 text-[13px] font-bold">{formatHoursMins(currentSubject?.studiedSeconds || 0)}</div>
                 </div>
-                <div className="rounded-[18px] border p-3" style={{ backgroundColor: 'var(--c-surface-alt)', borderColor: 'var(--c-border)' }}>
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--c-text-faint)' }}>الجلسات</div>
-                  <div className="mt-1 text-[14px] font-bold tabular-nums">{currentSubject?.sessions || 0}</div>
+                <div className="rounded-[var(--radius-md)] p-3" style={{ backgroundColor: 'var(--c-surface-alt)' }}>
+                  <div className="app-label mb-0" style={{ fontSize: '0.625rem' }}>الجلسات</div>
+                  <div className="mt-1 text-[13px] font-bold tabular-nums">{currentSubject?.sessions || 0}</div>
                 </div>
               </div>
             </div>
@@ -179,14 +187,14 @@ export default function TimerPage() {
                     key={preset.id}
                     type="button"
                     onClick={() => changeTimerPreset(preset.id)}
-                    className="w-full rounded-[18px] border p-3.5 text-right transition-all duration-200"
+                    className="w-full rounded-[var(--radius-lg)] border p-3 text-right transition-all duration-200"
                     style={{
                       backgroundColor: preset.id === timerPreset ? 'var(--c-accent-soft)' : 'var(--c-surface-alt)',
-                      borderColor: preset.id === timerPreset ? 'rgba(139, 92, 246, 0.25)' : 'var(--c-border)',
+                      borderColor: preset.id === timerPreset ? 'rgba(139, 92, 246, 0.22)' : 'var(--c-border)',
                     }}
                   >
                     <div className="text-[13px] font-bold">{preset.label}</div>
-                    <div className="mt-1 text-[10px] leading-5" style={{ color: 'var(--c-text-muted)' }}>{preset.description}</div>
+                    <div className="mt-0.5 text-[11px] leading-5" style={{ color: 'var(--c-text-muted)' }}>{preset.description}</div>
                   </button>
                 ))}
               </div>
@@ -206,57 +214,55 @@ export default function TimerPage() {
               )}
             >
               {settingsOpen ? (
-                <div className="space-y-3">
-                  <div className="grid gap-2.5 grid-cols-2">
-                    <label className="text-right">
-                      <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--c-text-faint)' }}>Focus</span>
-                      <input
-                        type="number"
-                        min="1"
-                        value={appData.pomodoroSettings.focusMinutes}
-                        onChange={(event) => updatePomodoroSettings({ focusMinutes: Number.parseInt(event.target.value, 10) || 25 })}
-                        className="w-full rounded-xl border px-3 py-2 text-[12px]"
-                        style={inputStyle}
-                      />
-                    </label>
-                    <label className="text-right">
-                      <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--c-text-faint)' }}>Custom focus</span>
-                      <input
-                        type="number"
-                        min="5"
-                        value={appData.pomodoroSettings.customFocusMinutes}
-                        onChange={(event) => updatePomodoroSettings({ customFocusMinutes: Number.parseInt(event.target.value, 10) || 45 })}
-                        className="w-full rounded-xl border px-3 py-2 text-[12px]"
-                        style={inputStyle}
-                      />
-                    </label>
-                    <label className="text-right">
-                      <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--c-text-faint)' }}>Short break</span>
-                      <input
-                        type="number"
-                        min="1"
-                        value={appData.pomodoroSettings.shortBreakMinutes}
-                        onChange={(event) => updatePomodoroSettings({ shortBreakMinutes: Number.parseInt(event.target.value, 10) || 5 })}
-                        className="w-full rounded-xl border px-3 py-2 text-[12px]"
-                        style={inputStyle}
-                      />
-                    </label>
-                    <label className="text-right">
-                      <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--c-text-faint)' }}>Long break</span>
-                      <input
-                        type="number"
-                        min="1"
-                        value={appData.pomodoroSettings.longBreakMinutes}
-                        onChange={(event) => updatePomodoroSettings({ longBreakMinutes: Number.parseInt(event.target.value, 10) || 15 })}
-                        className="w-full rounded-xl border px-3 py-2 text-[12px]"
-                        style={inputStyle}
-                      />
-                    </label>
-                  </div>
+                <div className="grid gap-3 grid-cols-2">
+                  <label className="text-right">
+                    <span className="app-label" style={{ fontSize: '0.625rem' }}>Focus</span>
+                    <input
+                      type="number"
+                      min="1"
+                      value={appData.pomodoroSettings.focusMinutes}
+                      onChange={(event) => updatePomodoroSettings({ focusMinutes: Number.parseInt(event.target.value, 10) || 25 })}
+                      className="app-control"
+                      style={inputStyle}
+                    />
+                  </label>
+                  <label className="text-right">
+                    <span className="app-label" style={{ fontSize: '0.625rem' }}>Custom focus</span>
+                    <input
+                      type="number"
+                      min="5"
+                      value={appData.pomodoroSettings.customFocusMinutes}
+                      onChange={(event) => updatePomodoroSettings({ customFocusMinutes: Number.parseInt(event.target.value, 10) || 45 })}
+                      className="app-control"
+                      style={inputStyle}
+                    />
+                  </label>
+                  <label className="text-right">
+                    <span className="app-label" style={{ fontSize: '0.625rem' }}>Short break</span>
+                    <input
+                      type="number"
+                      min="1"
+                      value={appData.pomodoroSettings.shortBreakMinutes}
+                      onChange={(event) => updatePomodoroSettings({ shortBreakMinutes: Number.parseInt(event.target.value, 10) || 5 })}
+                      className="app-control"
+                      style={inputStyle}
+                    />
+                  </label>
+                  <label className="text-right">
+                    <span className="app-label" style={{ fontSize: '0.625rem' }}>Long break</span>
+                    <input
+                      type="number"
+                      min="1"
+                      value={appData.pomodoroSettings.longBreakMinutes}
+                      onChange={(event) => updatePomodoroSettings({ longBreakMinutes: Number.parseInt(event.target.value, 10) || 15 })}
+                      className="app-control"
+                      style={inputStyle}
+                    />
+                  </label>
                 </div>
               ) : (
-                <div className="text-[13px] leading-6" style={{ color: 'var(--c-text-muted)' }}>
-                  الإعدادات مخفية الآن حتى تبقى الصفحة في وضع تركيز حقيقي. افتحها فقط عند الحاجة.
+                <div className="text-[12px] leading-6" style={{ color: 'var(--c-text-muted)' }}>
+                  الإعدادات مخفية الآن حتى تبقى الصفحة في وضع تركيز حقيقي.
                 </div>
               )}
             </SectionCard>

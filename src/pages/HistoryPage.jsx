@@ -44,8 +44,10 @@ export default function HistoryPage() {
     typeFilter,
   ]);
 
+  const inputStyle = { backgroundColor: 'var(--c-input)', borderColor: 'var(--c-border)', color: 'var(--c-text)' };
+
   return (
-    <div className="app-page">
+    <div className="app-page animate-fade-in">
       <PageHeader
         eyebrow="History"
         title="سجل جلسات الدراسة"
@@ -53,12 +55,12 @@ export default function HistoryPage() {
       />
 
       <SectionCard title="الفلاتر">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <select
             value={subjectFilter}
             onChange={(event) => setSubjectFilter(event.target.value)}
-            className="rounded-[12px] border px-4 py-3"
-            style={{ backgroundColor: 'var(--c-input)', borderColor: 'var(--c-border)', color: 'var(--c-text)' }}
+            className="app-control"
+            style={inputStyle}
           >
             <option value="all">كل المواد</option>
             {Object.keys(appData.subjects).map((subjectName) => (
@@ -69,8 +71,8 @@ export default function HistoryPage() {
           <select
             value={typeFilter}
             onChange={(event) => setTypeFilter(event.target.value)}
-            className="rounded-[12px] border px-4 py-3"
-            style={{ backgroundColor: 'var(--c-input)', borderColor: 'var(--c-border)', color: 'var(--c-text)' }}
+            className="app-control"
+            style={inputStyle}
           >
             <option value="all">كل الأنماط</option>
             <option value="pomodoro">Pomodoro</option>
@@ -81,8 +83,8 @@ export default function HistoryPage() {
           <select
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value)}
-            className="rounded-[12px] border px-4 py-3"
-            style={{ backgroundColor: 'var(--c-input)', borderColor: 'var(--c-border)', color: 'var(--c-text)' }}
+            className="app-control"
+            style={inputStyle}
           >
             <option value="all">كل الحالات</option>
             <option value="completed">مكتملة</option>
@@ -93,16 +95,16 @@ export default function HistoryPage() {
             type="date"
             value={fromDate}
             onChange={(event) => setFromDate(event.target.value)}
-            className="rounded-[12px] border px-4 py-3"
-            style={{ backgroundColor: 'var(--c-input)', borderColor: 'var(--c-border)', color: 'var(--c-text)' }}
+            className="app-control"
+            style={inputStyle}
           />
 
           <input
             type="date"
             value={toDate}
             onChange={(event) => setToDate(event.target.value)}
-            className="rounded-[12px] border px-4 py-3"
-            style={{ backgroundColor: 'var(--c-input)', borderColor: 'var(--c-border)', color: 'var(--c-text)' }}
+            className="app-control"
+            style={inputStyle}
           />
         </div>
       </SectionCard>
@@ -115,36 +117,36 @@ export default function HistoryPage() {
             description="جرّب تغيير الفلاتر أو ابدأ جلسة جديدة ليظهر السجل هنا مباشرة."
           />
         ) : (
-          <div className="overflow-hidden rounded-[20px] border" style={{ borderColor: 'var(--c-border)' }}>
+          <div className="overflow-hidden rounded-[var(--radius-lg)] border" style={{ borderColor: 'var(--c-border)' }}>
             <div
-              className="hidden grid-cols-[1.2fr_1fr_0.8fr_0.8fr_0.8fr] gap-4 border-b px-5 py-4 text-xs font-semibold uppercase tracking-[0.24em] md:grid"
-              style={{ backgroundColor: 'var(--c-surface-alt)', borderColor: 'var(--c-border)', color: 'var(--c-text-faint)' }}
+              className="hidden grid-cols-[1.2fr_1fr_0.8fr_0.8fr_0.8fr] gap-4 border-b px-5 py-3 md:grid"
+              style={{ backgroundColor: 'var(--c-surface-alt)', borderColor: 'var(--c-border)' }}
             >
-              <div>المادة</div>
-              <div>البداية</div>
-              <div>النهاية</div>
-              <div>المدة</div>
-              <div>الحالة</div>
+              <div className="app-label mb-0" style={{ fontSize: '0.625rem' }}>المادة</div>
+              <div className="app-label mb-0" style={{ fontSize: '0.625rem' }}>البداية</div>
+              <div className="app-label mb-0" style={{ fontSize: '0.625rem' }}>النهاية</div>
+              <div className="app-label mb-0" style={{ fontSize: '0.625rem' }}>المدة</div>
+              <div className="app-label mb-0" style={{ fontSize: '0.625rem' }}>الحالة</div>
             </div>
 
             <div className="divide-y" style={{ borderColor: 'var(--c-border)' }}>
               {sessions.map((session) => (
-                <div key={session.id} className="grid gap-3 px-5 py-4 md:grid-cols-[1.2fr_1fr_0.8fr_0.8fr_0.8fr] md:items-center">
+                <div key={session.id} className="grid gap-2 px-5 py-3.5 md:grid-cols-[1.2fr_1fr_0.8fr_0.8fr_0.8fr] md:items-center">
                   <div className="text-right">
-                    <div className="font-semibold">{session.subject}</div>
-                    <div className="mt-1 text-xs" style={{ color: 'var(--c-text-faint)' }}>
+                    <div className="text-[13px] font-semibold">{session.subject}</div>
+                    <div className="mt-0.5 text-[11px]" style={{ color: 'var(--c-text-faint)' }}>
                       {session.taskTitle || session.mode}
                     </div>
                   </div>
-                  <div className="text-sm" style={{ color: 'var(--c-text-muted)' }}>{formatDateTime(session.startedAt, appData.userProfile.timezone)}</div>
-                  <div className="text-sm" style={{ color: 'var(--c-text-muted)' }}>{formatDateTime(session.endedAt, appData.userProfile.timezone)}</div>
-                  <div className="font-semibold tabular-nums">{Math.round(session.durationSeconds / 60)}m</div>
+                  <div className="text-[13px]" style={{ color: 'var(--c-text-muted)' }}>{formatDateTime(session.startedAt, appData.userProfile.timezone)}</div>
+                  <div className="text-[13px]" style={{ color: 'var(--c-text-muted)' }}>{formatDateTime(session.endedAt, appData.userProfile.timezone)}</div>
+                  <div className="text-[13px] font-semibold tabular-nums">{Math.round(session.durationSeconds / 60)}m</div>
                   <div>
                     <span
-                      className="inline-flex rounded-full px-3 py-1 text-xs font-semibold"
+                      className="app-chip"
                       style={{
-                        backgroundColor: session.completed ? 'rgba(52, 211, 153, 0.12)' : 'rgba(245, 158, 11, 0.12)',
-                        color: session.completed ? '#34d399' : '#f59e0b',
+                        backgroundColor: session.completed ? 'var(--c-success-soft)' : 'var(--c-warning-soft)',
+                        color: session.completed ? 'var(--c-success)' : 'var(--c-warning)',
                       }}
                     >
                       {session.completed ? 'مكتملة' : 'متوقفة'}

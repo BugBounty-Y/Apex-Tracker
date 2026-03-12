@@ -8,25 +8,25 @@ const toneMap = {
     icon: <Icons.Info />,
     accent: '#22d3ee',
     background: 'rgba(8, 47, 73, 0.95)',
-    border: 'rgba(34, 211, 238, 0.2)',
+    border: 'rgba(34, 211, 238, 0.18)',
   },
   success: {
     icon: <Icons.CheckCircle />,
     accent: '#34d399',
     background: 'rgba(6, 78, 59, 0.95)',
-    border: 'rgba(52, 211, 153, 0.2)',
+    border: 'rgba(52, 211, 153, 0.18)',
   },
   warning: {
     icon: <Icons.AlertTriangle />,
-    accent: '#f59e0b',
+    accent: '#fbbf24',
     background: 'rgba(120, 53, 15, 0.95)',
-    border: 'rgba(245, 158, 11, 0.2)',
+    border: 'rgba(251, 191, 36, 0.18)',
   },
   danger: {
     icon: <Icons.XCircle />,
     accent: '#f87171',
     background: 'rgba(127, 29, 29, 0.95)',
-    border: 'rgba(248, 113, 113, 0.2)',
+    border: 'rgba(248, 113, 113, 0.18)',
   },
 };
 
@@ -60,18 +60,21 @@ export function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="fixed top-4 left-1/2 z-[90] w-full max-w-[420px] -translate-x-1/2 px-4 space-y-2.5 pointer-events-none">
+      <div className="fixed top-4 left-1/2 z-[90] w-full max-w-[400px] -translate-x-1/2 px-4 space-y-2 pointer-events-none">
         {toasts.map((toast) => {
           const tone = toneMap[toast.tone] || toneMap.info;
 
           return (
             <div
               key={toast.id}
-              className="pointer-events-auto rounded-2xl border p-4 shadow-2xl animate-slide-up backdrop-blur-sm"
+              className="pointer-events-auto rounded-[var(--radius-lg)] border p-3.5 animate-slide-up"
               style={{
                 backgroundColor: tone.background,
                 borderColor: tone.border,
                 color: '#ffffff',
+                boxShadow: 'var(--shadow-elevated)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
               }}
             >
               <div className="flex items-start gap-3">
@@ -81,13 +84,13 @@ export function ToastProvider({ children }) {
                 <div className="flex-1 text-right min-w-0">
                   <div className="text-[13px] font-bold">{toast.title}</div>
                   {toast.description && (
-                    <p className="mt-1 text-[12px] leading-5 text-white/70">{toast.description}</p>
+                    <p className="mt-0.5 text-[12px] leading-5 text-white/65">{toast.description}</p>
                   )}
                 </div>
                 <button
                   type="button"
                   onClick={() => dismissToast(toast.id)}
-                  className="rounded-lg p-1 text-white/50 transition-colors hover:text-white hover:bg-white/10 shrink-0"
+                  className="rounded-[var(--radius-sm)] p-1 text-white/40 transition-colors hover:text-white hover:bg-white/10 shrink-0"
                   aria-label="إغلاق التنبيه"
                 >
                   <Icons.X />

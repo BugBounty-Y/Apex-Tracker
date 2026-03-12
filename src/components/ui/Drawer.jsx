@@ -31,7 +31,8 @@ export default function Drawer({
 
   return (
     <div
-      className="fixed inset-0 z-[92] bg-black/55 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-[92] animate-fade-in"
+      style={{ backgroundColor: 'var(--c-overlay)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
       onClick={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
@@ -40,11 +41,12 @@ export default function Drawer({
       role="presentation"
     >
       <aside
-        className={`absolute inset-y-0 right-0 w-full ${widthClass} overflow-y-auto border-l px-5 py-5 shadow-2xl animate-slide-in-right md:px-6 md:py-6`}
+        className={`absolute inset-y-0 right-0 w-full ${widthClass} overflow-y-auto border-l px-5 py-5 animate-slide-in-right md:px-6 md:py-6`}
         style={{
           backgroundColor: 'var(--c-bg)',
           borderColor: 'var(--c-border)',
           color: 'var(--c-text)',
+          boxShadow: 'var(--shadow-elevated)',
           paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))',
         }}
         role="dialog"
@@ -52,9 +54,9 @@ export default function Drawer({
       >
         <div className="mb-6 flex items-start justify-between gap-4 border-b pb-5" style={{ borderColor: 'var(--c-border)' }}>
           <div className="min-w-0 flex-1 text-right">
-            <h2 className="text-[20px] font-bold tracking-tight md:text-[22px]">{title}</h2>
+            <h2 className="text-lg font-bold tracking-tight md:text-xl" style={{ letterSpacing: '-0.01em' }}>{title}</h2>
             {subtitle && (
-              <p className="mt-2 max-w-2xl text-[14px] leading-7" style={{ color: 'var(--c-text-muted)' }}>
+              <p className="mt-1.5 max-w-2xl text-[13px] leading-7" style={{ color: 'var(--c-text-muted)' }}>
                 {subtitle}
               </p>
             )}
@@ -63,7 +65,7 @@ export default function Drawer({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl border p-2 transition-colors hover:bg-white/[0.05]"
+            className="flex items-center justify-center h-9 w-9 rounded-[var(--radius-md)] border transition-colors hover:bg-[var(--c-surface-hover)]"
             style={{ borderColor: 'var(--c-border)', color: 'var(--c-text-muted)' }}
             aria-label="إغلاق اللوحة"
           >
@@ -71,7 +73,7 @@ export default function Drawer({
           </button>
         </div>
 
-        <div className="space-y-6">{children}</div>
+        <div className="space-y-5">{children}</div>
       </aside>
     </div>
   );

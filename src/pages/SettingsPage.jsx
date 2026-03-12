@@ -24,27 +24,27 @@ import {
 function ToggleRow({ icon, title, description, checked, onChange }) {
   return (
     <label
-      className="app-panel-muted flex cursor-pointer items-start justify-between gap-4 p-4"
+      className="app-panel-muted flex cursor-pointer items-start justify-between gap-4 p-4 transition-colors hover:bg-[var(--c-surface-hover)]"
     >
       <div className="flex items-start gap-3 text-right">
-        <div className="rounded-[14px] p-3" style={{ backgroundColor: 'rgba(139, 92, 246, 0.12)', color: 'var(--c-nav-active)' }}>
+        <div className="rounded-[var(--radius-md)] p-2.5 shrink-0" style={{ backgroundColor: 'var(--c-accent-soft)', color: 'var(--c-nav-active)' }}>
           {icon}
         </div>
         <div>
-          <div className="text-sm font-semibold">{title}</div>
-          <div className="mt-1 text-xs leading-6" style={{ color: 'var(--c-text-muted)' }}>
+          <div className="text-[13px] font-semibold">{title}</div>
+          <div className="mt-0.5 text-[11px] leading-5" style={{ color: 'var(--c-text-muted)' }}>
             {description}
           </div>
         </div>
       </div>
-      <div className="pt-1">
+      <div className="pt-1 shrink-0">
         <span
-          className="relative inline-flex h-7 w-12 items-center rounded-full transition-colors"
-          style={{ backgroundColor: checked ? '#8b5cf6' : 'var(--c-elevated)' }}
+          className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+          style={{ backgroundColor: checked ? 'var(--c-accent)' : 'var(--c-elevated)' }}
         >
           <span
-            className="absolute h-5 w-5 rounded-full bg-white transition-transform"
-            style={{ transform: checked ? 'translateX(-22px)' : 'translateX(-4px)' }}
+            className="absolute h-4.5 w-4.5 rounded-full bg-white shadow-sm transition-transform"
+            style={{ transform: checked ? 'translateX(-22px)' : 'translateX(-3px)', width: '18px', height: '18px' }}
           />
         </span>
         <input type="checkbox" className="sr-only" checked={checked} onChange={onChange} />
@@ -56,9 +56,7 @@ function ToggleRow({ icon, title, description, checked, onChange }) {
 function NumberField({ label, value, onChange, min = 0, max, suffix = '' }) {
   return (
     <label className="text-right">
-      <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--c-text-faint)' }}>
-        {label}
-      </span>
+      <span className="app-label">{label}</span>
       <div className="relative">
         <input
           type="number"
@@ -70,7 +68,7 @@ function NumberField({ label, value, onChange, min = 0, max, suffix = '' }) {
           style={{ backgroundColor: 'var(--c-input)', borderColor: 'var(--c-border)', color: 'var(--c-text)' }}
         />
         {suffix && (
-          <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-xs font-semibold" style={{ color: 'var(--c-text-faint)' }}>
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[11px] font-semibold" style={{ color: 'var(--c-text-faint)' }}>
             {suffix}
           </span>
         )}
@@ -355,9 +353,10 @@ export default function SettingsPage() {
 
   const isBusy = Boolean(busyAction);
   const selectedOffset = getTimeZoneOffsetLabel(profileForm.timezone);
+  const inputStyle = { backgroundColor: 'var(--c-input)', borderColor: 'var(--c-border)', color: 'var(--c-text)' };
 
   return (
-    <div className="app-page">
+    <div className="app-page animate-fade-in">
       <PageHeader
         eyebrow="Settings"
         title="الإعدادات"
@@ -376,41 +375,35 @@ export default function SettingsPage() {
       />
 
       <SectionCard title="Profile" subtitle="الهوية الأساسية التي تظهر في التطبيق وتحدد العدّ التنازلي بدقة.">
-        <div className="grid gap-4 lg:grid-cols-[1fr_1fr_1fr]">
+        <div className="grid gap-4 lg:grid-cols-3">
           <label className="text-right">
-            <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--c-text-faint)' }}>
-              الاسم
-            </span>
+            <span className="app-label">الاسم</span>
             <input
               type="text"
               value={profileForm.name}
               onChange={(event) => setProfileForm((currentValue) => ({ ...currentValue, name: event.target.value }))}
               className="app-control"
-              style={{ backgroundColor: 'var(--c-input)', borderColor: 'var(--c-border)', color: 'var(--c-text)' }}
+              style={inputStyle}
             />
           </label>
           <label className="text-right">
-            <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--c-text-faint)' }}>
-              تاريخ الامتحان
-            </span>
+            <span className="app-label">تاريخ الامتحان</span>
             <input
               type="date"
               min={getTodayKey(profileForm.timezone)}
               value={profileForm.examDate}
               onChange={(event) => setProfileForm((currentValue) => ({ ...currentValue, examDate: event.target.value }))}
               className="app-control"
-              style={{ backgroundColor: 'var(--c-input)', borderColor: 'var(--c-border)', color: 'var(--c-text)' }}
+              style={inputStyle}
             />
           </label>
           <label className="text-right">
-            <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--c-text-faint)' }}>
-              المنطقة الزمنية
-            </span>
+            <span className="app-label">المنطقة الزمنية</span>
             <select
               value={profileForm.timezone}
               onChange={(event) => setProfileForm((currentValue) => ({ ...currentValue, timezone: event.target.value }))}
               className="app-control"
-              style={{ backgroundColor: 'var(--c-input)', borderColor: 'var(--c-border)', color: 'var(--c-text)' }}
+              style={inputStyle}
             >
               {TIMEZONE_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -419,7 +412,7 @@ export default function SettingsPage() {
           </label>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-3 text-sm" style={{ color: 'var(--c-text-muted)' }}>
+        <div className="mt-4 flex flex-wrap items-center gap-2 text-[12px]" style={{ color: 'var(--c-text-muted)' }}>
           <div dir="ltr">{user?.email || 'Google Account'}</div>
           <span>•</span>
           <div>{selectedOffset}</div>
@@ -428,11 +421,7 @@ export default function SettingsPage() {
         </div>
 
         <div className="mt-5">
-          <button
-            type="button"
-            onClick={handleSaveProfile}
-            className="app-btn-primary"
-          >
+          <button type="button" onClick={handleSaveProfile} className="app-btn-primary">
             حفظ الملف الشخصي
           </button>
         </div>
@@ -444,15 +433,8 @@ export default function SettingsPage() {
           <NumberField label="Weekly" value={goalsForm.weeklyHours} min={1} max={200} suffix="h" onChange={(event) => setGoalsForm((currentValue) => ({ ...currentValue, weeklyHours: event.target.value }))} />
           <NumberField label="Monthly" value={goalsForm.monthlyHours} min={1} max={800} suffix="h" onChange={(event) => setGoalsForm((currentValue) => ({ ...currentValue, monthlyHours: event.target.value }))} />
         </div>
-
         <div className="mt-5">
-          <button
-            type="button"
-            onClick={handleSaveGoals}
-            className="app-btn-primary"
-          >
-            حفظ الأهداف
-          </button>
+          <button type="button" onClick={handleSaveGoals} className="app-btn-primary">حفظ الأهداف</button>
         </div>
       </SectionCard>
 
@@ -464,20 +446,13 @@ export default function SettingsPage() {
           <NumberField label="Sessions" value={pomodoroForm.sessionsBeforeLongBreak} min={1} max={12} onChange={(event) => setPomodoroForm((currentValue) => ({ ...currentValue, sessionsBeforeLongBreak: event.target.value }))} />
           <NumberField label="Custom Focus" value={pomodoroForm.customFocusMinutes} min={5} max={240} suffix="min" onChange={(event) => setPomodoroForm((currentValue) => ({ ...currentValue, customFocusMinutes: event.target.value }))} />
         </div>
-
         <div className="mt-5">
-          <button
-            type="button"
-            onClick={handleSavePomodoro}
-            className="app-btn-primary"
-          >
-            حفظ إعدادات المؤقت
-          </button>
+          <button type="button" onClick={handleSavePomodoro} className="app-btn-primary">حفظ إعدادات المؤقت</button>
         </div>
       </SectionCard>
 
       <SectionCard title="Notifications" subtitle="تحكم واضح في الأصوات والتنبيهات ونظام التذكير اليومي.">
-        <div className="space-y-4">
+        <div className="space-y-3">
           <ToggleRow
             icon={<Icons.Volume2 />}
             title="صوت نهاية الجلسة"
@@ -506,36 +481,29 @@ export default function SettingsPage() {
             checked={notificationForm.reminderEnabled}
             onChange={(event) => setNotificationForm((currentValue) => ({ ...currentValue, reminderEnabled: event.target.checked }))}
           />
-          <div className="max-w-[220px]">
+          <div className="max-w-[200px]">
             <NumberField label="Reminder Hour" value={notificationForm.reminderHour} min={0} max={23} onChange={(event) => setNotificationForm((currentValue) => ({ ...currentValue, reminderHour: event.target.value }))} />
           </div>
         </div>
-
         <div className="mt-5">
-          <button
-            type="button"
-            onClick={handleSaveNotifications}
-            className="app-btn-primary"
-          >
-            حفظ الإشعارات
-          </button>
+          <button type="button" onClick={handleSaveNotifications} className="app-btn-primary">حفظ الإشعارات</button>
         </div>
       </SectionCard>
 
       <SectionCard title="Backup & Export" subtitle="نسخة احتياطية واضحة، واستيراد آمن مع اختيار الدمج أو الاستبدال الكامل.">
-        <div className="grid gap-4 lg:grid-cols-[1fr_220px]">
+        <div className="grid gap-4 lg:grid-cols-[1fr_200px]">
           <div className="space-y-4">
             <div className="app-panel-muted p-4">
-              <div className="text-sm font-semibold">الحالة الحالية</div>
-              <div className="mt-2 flex flex-wrap items-center gap-3">
+              <div className="text-[13px] font-semibold">الحالة الحالية</div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
                 <StatusBadge status={syncStatus} />
-                <div className="text-sm" style={{ color: 'var(--c-text-muted)' }}>
+                <div className="text-[12px]" style={{ color: 'var(--c-text-muted)' }}>
                   {user?.email ? 'مرتبطة بحسابك الحالي' : 'تعمل محليًا حتى يتم تسجيل الدخول'}
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2.5">
               <button
                 type="button"
                 onClick={exportBackup}
@@ -559,21 +527,19 @@ export default function SettingsPage() {
 
           <div className="space-y-3">
             <label className="text-right">
-              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--c-text-faint)' }}>
-                Import Mode
-              </span>
+              <span className="app-label">Import Mode</span>
               <select
                 value={importMode}
                 onChange={(event) => setImportMode(event.target.value)}
                 className="app-control"
-                style={{ backgroundColor: 'var(--c-input)', borderColor: 'var(--c-border)', color: 'var(--c-text)' }}
+                style={inputStyle}
               >
                 <option value="merge">دمج مع البيانات الحالية</option>
                 <option value="replace">استبدال كامل</option>
               </select>
             </label>
-            <div className="text-sm leading-7" style={{ color: 'var(--c-text-muted)' }}>
-              وضع الدمج هو الخيار الآمن افتراضيًا. استخدم الاستبدال فقط عندما تريد الرجوع إلى نسخة محددة بالكامل.
+            <div className="text-[12px] leading-6" style={{ color: 'var(--c-text-muted)' }}>
+              وضع الدمج هو الخيار الآمن افتراضيًا.
             </div>
           </div>
         </div>
@@ -587,18 +553,18 @@ export default function SettingsPage() {
         />
       </SectionCard>
 
-      <SectionCard title="Privacy" subtitle="روابط واضحة للخصوصية والشروط، مع توضيح بسيط لكيفية المراقبة بعد الإطلاق.">
-        <div className="grid gap-4 md:grid-cols-2">
+      <SectionCard title="Privacy" subtitle="روابط واضحة للخصوصية والشروط.">
+        <div className="grid gap-3 md:grid-cols-2">
           <Link
             to="/privacy"
-            className="app-panel-muted p-4 transition-colors"
+            className="app-panel-muted p-4 transition-colors hover:bg-[var(--c-surface-hover)]"
             style={{ color: 'var(--c-text)' }}
           >
             <div className="flex items-center gap-3">
               <Icons.ShieldCheck />
               <div className="text-right">
-                <div className="text-sm font-semibold">سياسة الخصوصية</div>
-                <div className="mt-1 text-xs leading-6" style={{ color: 'var(--c-text-muted)' }}>
+                <div className="text-[13px] font-semibold">سياسة الخصوصية</div>
+                <div className="mt-0.5 text-[11px] leading-5" style={{ color: 'var(--c-text-muted)' }}>
                   ماذا نخزن، لماذا نخزنه، وما الذي يمكنك التحكم فيه.
                 </div>
               </div>
@@ -606,14 +572,14 @@ export default function SettingsPage() {
           </Link>
           <Link
             to="/terms"
-            className="app-panel-muted p-4 transition-colors"
+            className="app-panel-muted p-4 transition-colors hover:bg-[var(--c-surface-hover)]"
             style={{ color: 'var(--c-text)' }}
           >
             <div className="flex items-center gap-3">
               <Icons.FileText />
               <div className="text-right">
-                <div className="text-sm font-semibold">الشروط والأحكام</div>
-                <div className="mt-1 text-xs leading-6" style={{ color: 'var(--c-text-muted)' }}>
+                <div className="text-[13px] font-semibold">الشروط والأحكام</div>
+                <div className="mt-0.5 text-[11px] leading-5" style={{ color: 'var(--c-text-muted)' }}>
                   بنود الاستخدام الأساسية وحدود الخدمة ومسؤولية المستخدم.
                 </div>
               </div>
@@ -623,7 +589,7 @@ export default function SettingsPage() {
       </SectionCard>
 
       <SectionCard title="Danger Zone" subtitle="إجراءات غير قابلة للتراجع تمر كلها عبر تأكيد واضح وحماية من فقدان البيانات.">
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-2.5">
           <button
             type="button"
             onClick={handleClearData}

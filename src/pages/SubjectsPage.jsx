@@ -111,7 +111,7 @@ export default function SubjectsPage() {
       />
 
       <SectionCard title="إضافة مادة جديدة" subtitle="ابدأ ببساطة: اسم واضح وهدف تقريبي بالساعات.">
-        <div className="grid gap-3 md:grid-cols-[1fr_160px_140px]">
+        <div className="grid gap-3 md:grid-cols-[1fr_140px_130px]">
           <input
             type="text"
             value={draftSubject.name}
@@ -142,8 +142,8 @@ export default function SubjectsPage() {
         title="المواد"
         subtitle="ابحث، صفِّ، وافتح التفاصيل من Drawer منظم."
         action={(
-          <div className="flex flex-wrap gap-2.5">
-            <div className="relative min-w-[220px] flex-1 sm:flex-none">
+          <div className="flex flex-wrap gap-2">
+            <div className="relative min-w-[200px] flex-1 sm:flex-none">
               <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--c-text-faint)' }}>
                 <Icons.Search />
               </div>
@@ -159,7 +159,7 @@ export default function SubjectsPage() {
             <select
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
-              className="app-control sm:w-[170px]"
+              className="app-control sm:w-[160px]"
               style={inputStyle}
             >
               <option value="all">كل المواد</option>
@@ -188,35 +188,36 @@ export default function SubjectsPage() {
                     setActiveTaskId(subject.tasks[0].id);
                   }
                 }}
-                className="rounded-2xl border p-5 text-right transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/5"
+                className="rounded-[var(--radius-card)] border p-4 text-right transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[var(--shadow-card-hover)]"
                 style={{ backgroundColor: 'var(--c-surface-alt)', borderColor: 'var(--c-border)' }}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <div className="text-[15px] font-bold truncate">{subject.name}</div>
-                    <div className="mt-1.5 text-[12px]" style={{ color: 'var(--c-text-muted)' }}>
+                    <div className="text-[14px] font-bold truncate">{subject.name}</div>
+                    <div className="mt-1 text-[12px]" style={{ color: 'var(--c-text-muted)' }}>
                       {formatHoursMins(subject.studiedSeconds)} من {subject.goalHours}h
                     </div>
                   </div>
-                  <div className="rounded-full px-2.5 py-1 text-[11px] font-bold shrink-0"
+                  <div
+                    className="app-chip"
                     style={{ backgroundColor: 'var(--c-accent-soft)', color: 'var(--c-nav-active)' }}
                   >
                     {subject.progressPercent.toFixed(0)}%
                   </div>
                 </div>
 
-                <div className="mt-3.5 h-1.5 overflow-hidden rounded-full" style={{ backgroundColor: 'var(--c-elevated)' }}>
-                  <div className="h-full rounded-full bg-gradient-to-l from-violet-500 to-cyan-400 transition-all duration-500" style={{ width: `${subject.progressPercent}%` }} />
+                <div className="mt-3 app-progress">
+                  <div className="app-progress-bar" style={{ width: `${subject.progressPercent}%` }} />
                 </div>
 
-                <div className="mt-3.5 grid gap-2 grid-cols-2">
+                <div className="mt-3 grid gap-2 grid-cols-2">
                   <div>
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--c-text-faint)' }}>المهام المفتوحة</div>
-                    <div className="mt-1 text-sm font-bold">{subject.openTasks}</div>
+                    <div className="app-label mb-0" style={{ fontSize: '0.625rem' }}>المهام المفتوحة</div>
+                    <div className="mt-0.5 text-[13px] font-bold">{subject.openTasks}</div>
                   </div>
                   <div>
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--c-text-faint)' }}>آخر جلسة</div>
-                    <div className="mt-1 text-[12px]" style={{ color: 'var(--c-text-muted)' }}>
+                    <div className="app-label mb-0" style={{ fontSize: '0.625rem' }}>آخر جلسة</div>
+                    <div className="mt-0.5 text-[11px]" style={{ color: 'var(--c-text-muted)' }}>
                       {subject.lastSessionAt
                         ? formatTimestampInTimeZone(subject.lastSessionAt, appData.userProfile.timezone, 'ar', { month: 'short', day: 'numeric' })
                         : 'لا توجد'}
@@ -239,16 +240,16 @@ export default function SubjectsPage() {
           <>
             <SectionCard title="ملخص سريع">
               <div className="grid gap-3 md:grid-cols-3">
-                <div className="rounded-2xl border p-3.5" style={{ backgroundColor: 'var(--c-surface-alt)', borderColor: 'var(--c-border)' }}>
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--c-text-faint)' }}>المنجز</div>
+                <div className="rounded-[var(--radius-lg)] border p-3.5" style={{ backgroundColor: 'var(--c-surface-alt)', borderColor: 'var(--c-border)' }}>
+                  <div className="app-label mb-0" style={{ fontSize: '0.625rem' }}>المنجز</div>
                   <div className="mt-1.5 text-lg font-bold">{formatHoursMins(selectedSubject.studiedSeconds)}</div>
                 </div>
-                <div className="rounded-2xl border p-3.5" style={{ backgroundColor: 'var(--c-surface-alt)', borderColor: 'var(--c-border)' }}>
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--c-text-faint)' }}>الجلسات</div>
+                <div className="rounded-[var(--radius-lg)] border p-3.5" style={{ backgroundColor: 'var(--c-surface-alt)', borderColor: 'var(--c-border)' }}>
+                  <div className="app-label mb-0" style={{ fontSize: '0.625rem' }}>الجلسات</div>
                   <div className="mt-1.5 text-lg font-bold tabular-nums">{selectedSubject.sessions}</div>
                 </div>
-                <div className="rounded-2xl border p-3.5" style={{ backgroundColor: 'var(--c-surface-alt)', borderColor: 'var(--c-border)' }}>
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--c-text-faint)' }}>الهدف</div>
+                <div className="rounded-[var(--radius-lg)] border p-3.5" style={{ backgroundColor: 'var(--c-surface-alt)', borderColor: 'var(--c-border)' }}>
+                  <div className="app-label mb-0" style={{ fontSize: '0.625rem' }}>الهدف</div>
                   <div className="mt-1.5 text-lg font-bold tabular-nums">{selectedSubject.goalHours}h</div>
                 </div>
               </div>
@@ -263,7 +264,7 @@ export default function SubjectsPage() {
                   onChange={(event) => updateSubject(selectedSubjectName, {
                     goalHours: Number.parseInt(event.target.value, 10) || 1,
                   })}
-                  className="rounded-xl border px-4 py-2.5 text-[13px]"
+                  className="app-control"
                   style={inputStyle}
                 />
                 <textarea
@@ -271,20 +272,20 @@ export default function SubjectsPage() {
                   value={selectedSubject.notes}
                   onChange={(event) => updateSubject(selectedSubjectName, { notes: event.target.value })}
                   placeholder="ملاحظات سريعة عن المادة أو الخطة القادمة"
-                  className="rounded-xl border px-4 py-2.5 text-[13px]"
+                  className="app-control min-h-[80px]"
                   style={inputStyle}
                 />
               </div>
             </SectionCard>
 
             <SectionCard title="المهام / Topics">
-              <div className="grid gap-3 md:grid-cols-[1fr_150px_100px]">
+              <div className="grid gap-3 md:grid-cols-[1fr_130px_90px]">
                 <input
                   type="text"
                   value={taskDraft.title}
                   onChange={(event) => setTaskDraft((currentValue) => ({ ...currentValue, title: event.target.value }))}
                   placeholder="اسم المهمة أو الفصل"
-                  className="rounded-xl border px-4 py-2.5 text-[13px]"
+                  className="app-control"
                   style={inputStyle}
                 />
                 <input
@@ -292,39 +293,44 @@ export default function SubjectsPage() {
                   min="5"
                   value={taskDraft.estimatedMinutes}
                   onChange={(event) => setTaskDraft((currentValue) => ({ ...currentValue, estimatedMinutes: event.target.value }))}
-                  className="rounded-xl border px-4 py-2.5 text-[13px]"
+                  className="app-control"
                   style={inputStyle}
                 />
                 <button
                   type="button"
                   onClick={handleAddTask}
-                  className="rounded-xl bg-violet-600 px-4 py-2.5 text-[13px] font-bold text-white transition-colors hover:bg-violet-500"
+                  className="app-btn-primary"
                 >
                   إضافة
                 </button>
               </div>
 
-              <div className="mt-4 space-y-2.5">
+              <div className="mt-4 space-y-2">
                 {selectedSubject.tasks.length === 0 ? (
                   <div className="text-[13px]" style={{ color: 'var(--c-text-muted)' }}>
                     لا توجد مهام بعد. أضف Topic أو Chapter لتتحول المادة من ساعات عامة إلى خطة قابلة للتنفيذ.
                   </div>
                 ) : (
                   selectedSubject.tasks.map((task) => (
-                    <div key={task.id} className="flex items-center justify-between gap-3 rounded-2xl border p-3.5"
+                    <div
+                      key={task.id}
+                      className="flex items-center justify-between gap-3 rounded-[var(--radius-lg)] border p-3"
                       style={{ backgroundColor: 'var(--c-surface-alt)', borderColor: 'var(--c-border)' }}
                     >
                       <div className="flex items-center gap-3 min-w-0 flex-1">
                         <button
                           type="button"
                           onClick={() => toggleTask(selectedSubjectName, task.id)}
-                          className="rounded-full p-1 shrink-0 transition-colors"
+                          className="rounded-full p-0.5 shrink-0 transition-colors"
                           style={{ color: task.done ? 'var(--c-success)' : 'var(--c-text-faint)' }}
                         >
                           {task.done ? <Icons.CheckCircle /> : <Icons.ListTodo />}
                         </button>
                         <div className="text-right min-w-0">
-                          <div className="text-[13px] font-bold truncate" style={{ textDecoration: task.done ? 'line-through' : 'none', opacity: task.done ? 0.6 : 1 }}>
+                          <div
+                            className="text-[13px] font-bold truncate"
+                            style={{ textDecoration: task.done ? 'line-through' : 'none', opacity: task.done ? 0.55 : 1 }}
+                          >
                             {task.title}
                           </div>
                           <div className="mt-0.5 text-[11px]" style={{ color: 'var(--c-text-faint)' }}>
@@ -335,8 +341,7 @@ export default function SubjectsPage() {
                       <button
                         type="button"
                         onClick={() => deleteTask(selectedSubjectName, task.id)}
-                        className="rounded-xl border px-3 py-1.5 text-[12px] font-semibold shrink-0 transition-colors hover:bg-red-500/10"
-                        style={{ borderColor: 'var(--c-border)', color: 'var(--c-danger)' }}
+                        className="app-btn-danger-soft min-h-0 px-2.5 py-1 text-[11px]"
                       >
                         حذف
                       </button>
@@ -346,12 +351,11 @@ export default function SubjectsPage() {
               </div>
             </SectionCard>
 
-            <div className="flex justify-between gap-3">
+            <div className="pt-2">
               <button
                 type="button"
                 onClick={handleDeleteSubject}
-                className="rounded-xl bg-red-500/12 px-4 py-2.5 text-[13px] font-bold transition-colors hover:bg-red-500/18"
-                style={{ color: 'var(--c-danger)' }}
+                className="app-btn-danger-soft"
               >
                 حذف المادة
               </button>
