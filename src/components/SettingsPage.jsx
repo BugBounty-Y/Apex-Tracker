@@ -52,6 +52,7 @@ export default function SettingsPage({
   const handleClearData = async () => {
     if (window.confirm('هل أنت متأكد من حذف جميع بياناتك (المواد، السجل، وساعات الدراسة)؟ لا يمكن التراجع عن هذا الإجراء.')) {
       if (window.confirm('تأكيد أخير: سيتم مسح كل شيء!')) {
+        window.isClearingData = true; // Prevent App.jsx from saving state on reload
         localStorage.removeItem('apex-tracker-data');
         if (user?.uid) await clearUserData(user.uid);
         window.location.reload();
@@ -71,6 +72,8 @@ export default function SettingsPage({
           onLogout();
           return;
         }
+
+        window.isClearingData = true; // Prevent App.jsx from saving state on reload
 
         // Clear data from Firestore first so we don't leave orphaned document
         if (user?.uid) await clearUserData(user.uid);

@@ -177,7 +177,7 @@ function AppInner() {
   // --- Save immediately on tab close or hide to prevent data loss ---
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
+      if (document.visibilityState === 'hidden' && !window.isClearingData) {
         saveData(latestStateRef.current);
         if (user?.uid) {
           saveUserData(user.uid, latestStateRef.current);
@@ -186,6 +186,8 @@ function AppInner() {
     };
 
     const handleBeforeUnload = () => {
+      if (window.isClearingData) return;
+      
       saveData(latestStateRef.current);
       if (user?.uid) {
         saveUserData(user.uid, latestStateRef.current);

@@ -11,6 +11,9 @@ export function getRemainingDays(examDateStr) {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   const examDate = new Date(examDateStr);
+  
+  if (isNaN(examDate.getTime())) return 0; // Prevent NaN errors
+  
   const diff = Math.ceil((examDate - now) / (1000 * 60 * 60 * 24));
   return Math.max(0, diff);
 }
