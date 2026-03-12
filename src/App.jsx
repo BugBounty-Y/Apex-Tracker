@@ -5,11 +5,35 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AppDataProvider, useAppData } from './contexts/AppDataContext';
 import { ToastProvider } from './components/ui/ToastProvider';
 import { ConfirmDialogProvider } from './components/ui/ConfirmDialogProvider';
+import { Icons } from './components/Icons';
 import AuthPage from './components/AuthPage';
 import AppShell from './components/AppShell';
 
+/* ─── Global Theme Toggle — always visible on every page ─── */
+function GlobalThemeToggle() {
+  const { theme, toggleTheme } = useTheme();
+
+  return (
+    <button
+      type="button"
+      onClick={toggleTheme}
+      className="fixed top-4 left-4 z-[50] flex items-center justify-center h-10 w-10 rounded-full border backdrop-blur-xl transition-all duration-200 hover:scale-110 active:scale-95"
+      style={{
+        backgroundColor: theme === 'light' ? 'rgba(255,255,255,0.8)' : 'rgba(23,23,26,0.8)',
+        borderColor: 'var(--c-border)',
+        color: 'var(--c-text-muted)',
+        boxShadow: '0 2px 10px rgba(0,0,0,0.15)',
+      }}
+      aria-label={theme === 'light' ? 'تفعيل الوضع الداكن' : 'تفعيل الوضع الفاتح'}
+    >
+      {theme === 'light' ? <Icons.Moon /> : <Icons.Sun />}
+    </button>
+  );
+}
+
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const SubjectsPage = lazy(() => import('./pages/SubjectsPage'));
+const TasksPage = lazy(() => import('./pages/TasksPage'));
 const TimerPage = lazy(() => import('./pages/TimerPage'));
 const InsightsPage = lazy(() => import('./pages/InsightsPage'));
 const HistoryPage = lazy(() => import('./pages/HistoryPage'));
@@ -93,6 +117,7 @@ function AuthenticatedApp() {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<PageLoader><DashboardPage /></PageLoader>} />
           <Route path="/subjects" element={<PageLoader><SubjectsPage /></PageLoader>} />
+          <Route path="/tasks" element={<PageLoader><TasksPage /></PageLoader>} />
           <Route path="/timer" element={<PageLoader><TimerPage /></PageLoader>} />
           <Route path="/insights" element={<PageLoader><InsightsPage /></PageLoader>} />
           <Route path="/history" element={<PageLoader><HistoryPage /></PageLoader>} />
@@ -125,6 +150,7 @@ function AppRouter() {
 export default function App() {
   return (
     <ThemeProvider>
+      <GlobalThemeToggle />
       <AuthProvider>
         <ToastProvider>
           <ConfirmDialogProvider>

@@ -60,7 +60,7 @@ export function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="fixed top-4 left-1/2 z-[90] w-full max-w-[400px] -translate-x-1/2 px-4 space-y-2 pointer-events-none">
+      <div className="fixed top-4 left-1/2 z-[100] w-full max-w-[400px] -translate-x-1/2 px-4 space-y-2 pointer-events-none">
         {toasts.map((toast) => {
           const tone = toneMap[toast.tone] || toneMap.info;
 

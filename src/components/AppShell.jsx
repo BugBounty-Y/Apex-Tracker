@@ -10,6 +10,7 @@ import { trackEvent } from '../utils/telemetry';
 const primaryNavigation = [
   { to: '/dashboard', label: 'لوحة التحكم', icon: <Icons.LayoutGrid /> },
   { to: '/subjects', label: 'المواد', icon: <Icons.Book /> },
+  { to: '/tasks', label: 'المهام', icon: <Icons.ListTodo /> },
   { to: '/timer', label: 'المؤقت', icon: <Icons.Timer /> },
   { to: '/insights', label: 'التحليلات', icon: <Icons.BarChart3 /> },
 ];
@@ -25,7 +26,7 @@ const utilityNavigation = [
   { to: '/terms', label: 'الشروط' },
 ];
 
-function NavItem({ item, compact = false, onClick }) {
+function NavItem({ item, compact = false, onClick, badge }) {
   return (
     <NavLink
       to={item.to}
@@ -47,10 +48,19 @@ function NavItem({ item, compact = false, onClick }) {
             {item.icon}
           </span>
           {!compact && (
-            <span className="text-[13px] font-semibold">{item.label}</span>
+            <span className="text-[13px] font-semibold flex-1">{item.label}</span>
           )}
           {compact && (
             <span className="text-[10px] font-semibold leading-none">{item.label}</span>
+          )}
+          {/* Badge — desktop only */}
+          {!compact && badge > 0 && (
+            <span
+              className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold"
+              style={{ backgroundColor: 'var(--c-warning-soft)', color: 'var(--c-warning)' }}
+            >
+              {badge}
+            </span>
           )}
         </>
       )}
@@ -59,7 +69,7 @@ function NavItem({ item, compact = false, onClick }) {
 }
 
 export default function AppShell() {
-  const { theme, toggleTheme } = useTheme();
+  const { theme } = useTheme();
   const { user } = useAuth();
   const { appData, syncStatus, activeSubject, todaySeconds } = useAppData();
   const location = useLocation();
@@ -67,10 +77,16 @@ export default function AppShell() {
 
   const studentName = appData.userProfile.name || user?.displayName || 'طالب';
 
-  const activeSection = useMemo(() => {
-    const allItems = [...primaryNavigation, ...secondaryNavigation, ...utilityNavigation];
-    return allItems.find((item) => location.pathname.startsWith(item.to));
-  }, [location.pathname]);
+  // Count total open tasks for the badge
+  const totalOpenTasks = useMemo(() => {
+    let count = 0;
+    for (const subject of Object.values(appData.subjects)) {
+      for (const task of subject.tasks) {
+        if (!task.done) count += 1;
+      }
+    }
+    return count;
+  }, [appData.subjects]);
 
   useEffect(() => {
     trackEvent('page_view', { path: location.pathname });
@@ -95,7 +111,7 @@ export default function AppShell() {
     >
       {/* ===== DESKTOP SIDEBAR ===== */}
       <aside
-        className="fixed inset-y-0 right-0 z-40 hidden w-[260px] border-l lg:flex lg:flex-col"
+        className="fixed inset-y-0 right-0 z-40 hidden w-[260px] border-l lg:flex lg:flex-col overflow-y-auto"
         style={{
           backgroundColor: 'var(--c-bg)',
           borderColor: 'var(--c-border)',
@@ -142,21 +158,21 @@ export default function AppShell() {
 
         {/* Primary nav */}
         <nav className="mt-5 px-3 space-y-0.5">
-          <div
-            className="app-label mb-1.5 px-3"
-            style={{ fontSize: '0.625rem' }}
-          >
+          <div className="app-label mb-1.5 px-3" style={{ fontSize: '0.625rem' }}>
             التنقل الرئيسي
           </div>
-          {primaryNavigation.map((item) => <NavItem key={item.to} item={item} />)}
+          {primaryNavigation.map((item) => (
+            <NavItem
+              key={item.to}
+              item={item}
+              badge={item.to === '/tasks' ? totalOpenTasks : 0}
+            />
+          ))}
         </nav>
 
         {/* Secondary nav */}
         <nav className="mt-5 px-3 space-y-0.5">
-          <div
-            className="app-label mb-1.5 px-3"
-            style={{ fontSize: '0.625rem' }}
-          >
+          <div className="app-label mb-1.5 px-3" style={{ fontSize: '0.625rem' }}>
             صفحات مساندة
           </div>
           {secondaryNavigation.map((item) => <NavItem key={item.to} item={item} />)}
@@ -172,53 +188,8 @@ export default function AppShell() {
         </div>
       </aside>
 
-      {/* ===== MAIN CONTENT ===== */}
+      {/* ===== MAIN CONTENT (no header) ===== */}
       <div className="lg:pr-[260px]">
-        {/* Header */}
-        <header
-          className="sticky top-0 z-30 border-b backdrop-blur-xl"
-          style={{
-            backgroundColor: theme === 'light' ? 'rgba(248, 248, 250, 0.88)' : 'rgba(9, 9, 11, 0.88)',
-            borderColor: 'var(--c-border)',
-          }}
-        >
-          <div className="mx-auto flex max-w-[1320px] items-center justify-between gap-4 px-4 py-3 md:px-5 lg:px-6">
-            <div className="text-right">
-              <div className="app-label mb-0" style={{ fontSize: '0.625rem' }}>
-                Apex Workspace
-              </div>
-              <div className="mt-0.5 text-[15px] font-bold md:text-base">
-                {activeSection?.label || 'لوحة التحكم'}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <div className="hidden sm:block">
-                <StatusBadge status={syncStatus} />
-              </div>
-              <button
-                type="button"
-                onClick={toggleTheme}
-                className="flex items-center justify-center h-9 w-9 rounded-[var(--radius-md)] border transition-all duration-200 hover:bg-[var(--c-surface-hover)]"
-                style={{ borderColor: 'var(--c-border)', color: 'var(--c-text-muted)' }}
-                aria-label={theme === 'light' ? 'تفعيل الوضع الداكن' : 'تفعيل الوضع الفاتح'}
-              >
-                {theme === 'light' ? <Icons.Moon /> : <Icons.Sun />}
-              </button>
-              <button
-                type="button"
-                className="flex items-center justify-center h-9 w-9 rounded-[var(--radius-md)] border transition-all duration-200 lg:hidden hover:bg-[var(--c-surface-hover)]"
-                style={{ borderColor: 'var(--c-border)', color: 'var(--c-text-muted)' }}
-                onClick={() => setMobileMoreOpen(true)}
-                aria-label="فتح الصفحات الثانوية"
-              >
-                <Icons.MoreHorizontal />
-              </button>
-            </div>
-          </div>
-        </header>
-
-        {/* Main content area */}
         <main className="px-4 pb-28 pt-6 md:px-5 lg:px-6 lg:pb-10">
           <div className="mx-auto max-w-[1320px]">
             <Outlet />
@@ -237,7 +208,7 @@ export default function AppShell() {
           WebkitBackdropFilter: 'blur(20px)',
         }}
       >
-        <div className="grid grid-cols-5 gap-0.5 px-1 py-1">
+        <div className="grid grid-cols-6 gap-0.5 px-1 py-1">
           {primaryNavigation.map((item) => (
             <NavItem key={item.to} item={item} compact />
           ))}
