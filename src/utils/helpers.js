@@ -40,6 +40,8 @@ const LEGACY_TIMEZONE_ALIASES = {
 
 const dateFormatterCache = new Map();
 const offsetFormatterCache = new Map();
+const hourFormatterCache = new Map();
+const localeFormatterCache = new Map();
 
 export function formatTime(sec) {
   const s = Math.max(0, Math.floor(sec));
@@ -115,6 +117,31 @@ function getOffsetFormatter(timeZone) {
   return offsetFormatterCache.get(timeZone);
 }
 
+function getHourFormatter(timeZone) {
+  if (!hourFormatterCache.has(timeZone)) {
+    hourFormatterCache.set(timeZone, new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hour: '2-digit',
+      hour12: false,
+    }));
+  }
+
+  return hourFormatterCache.get(timeZone);
+}
+
+function getLocaleFormatter(locale, timeZone, options = {}) {
+  const cacheKey = JSON.stringify([locale, timeZone, options]);
+
+  if (!localeFormatterCache.has(cacheKey)) {
+    localeFormatterCache.set(cacheKey, new Intl.DateTimeFormat(locale, {
+      ...options,
+      timeZone,
+    }));
+  }
+
+  return localeFormatterCache.get(cacheKey);
+}
+
 export function buildDateKey(year, month, day) {
   return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
@@ -188,9 +215,52 @@ export function getTimeZoneOffsetLabel(userTimezone = DEFAULT_TIMEZONE, date = n
   }
 }
 
+export function getHourInTimeZone(date = new Date(), userTimezone = DEFAULT_TIMEZONE) {
+  const timeZone = normalizeTimeZone(userTimezone);
+
+  try {
+    return Number(getHourFormatter(timeZone).format(date));
+  } catch {
+    return date.getHours();
+  }
+}
+
 export function getTimeZoneOptionLabel(userTimezone = DEFAULT_TIMEZONE) {
   const normalizedSelection = normalizeTimeZoneSelection(userTimezone);
   return TIMEZONE_OPTIONS.find((option) => option.value === normalizedSelection)?.label || normalizedSelection;
+}
+
+export function formatTimestampInTimeZone(
+  value,
+  userTimezone = DEFAULT_TIMEZONE,
+  locale = 'ar',
+  options = {},
+) {
+  if (!value) return '';
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+
+  const timeZone = normalizeTimeZone(userTimezone);
+
+  try {
+    return getLocaleFormatter(locale, timeZone, options).format(date);
+  } catch {
+    return '';
+  }
+}
+
+export function formatDateKeyForDisplay(dateKey, locale = 'ar', options = {}) {
+  const parsedDate = parseDateKey(dateKey);
+  if (!parsedDate) return '';
+
+  const date = new Date(Date.UTC(parsedDate.year, parsedDate.month - 1, parsedDate.day));
+
+  try {
+    return getLocaleFormatter(locale, 'UTC', options).format(date);
+  } catch {
+    return '';
+  }
 }
 
 /**

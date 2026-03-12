@@ -4,6 +4,7 @@
 // ==========================================
 import { deleteDoc, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { getTodayKey, shiftDateKey } from './helpers';
+import { normalizeAppData } from './appData';
 import { db } from '../firebase';
 
 const STORAGE_KEY_PREFIX = 'apex-tracker-data';
@@ -36,12 +37,10 @@ function resolveUpdatedAtMs(value, fallbackValue) {
 function normalizePersistedData(data, ownerUid = null, fallbackUpdatedAt = 0) {
   if (!isPlainObject(data)) return null;
 
+  const normalizedAppData = normalizeAppData(data);
+
   return {
-    subjects: isPlainObject(data.subjects) ? data.subjects : {},
-    dailyLog: isPlainObject(data.dailyLog) ? data.dailyLog : {},
-    dailyGoal: Math.max(1, Number.parseInt(data.dailyGoal, 10) || 3),
-    userProfile: isPlainObject(data.userProfile) ? data.userProfile : {},
-    pomodoroSettings: isPlainObject(data.pomodoroSettings) ? data.pomodoroSettings : {},
+    ...normalizedAppData,
     ownerUid: ownerUid || data.ownerUid || null,
     updatedAt: resolveUpdatedAtMs(data.updatedAtMs ?? data.updatedAt, fallbackUpdatedAt),
   };
@@ -187,6 +186,7 @@ export async function saveUserData(uid, data) {
       subjects: snapshot.subjects,
       dailyLog: snapshot.dailyLog,
       dailyGoal: snapshot.dailyGoal,
+      studySessions: snapshot.studySessions,
       userProfile: snapshot.userProfile,
       pomodoroSettings: snapshot.pomodoroSettings,
       ownerUid: uid,

@@ -1,16 +1,12 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { playNotificationSound } from '../utils/helpers';
+import { DEFAULT_NOTIFICATION_SETTINGS, DEFAULT_POMODORO_SETTINGS } from '../utils/appData';
 
 /**
  * Default Pomodoro settings.
  * These are used when no custom settings are provided.
  */
-export const DEFAULT_POMODORO_SETTINGS = {
-  focusMinutes: 25,
-  shortBreakMinutes: 5,
-  longBreakMinutes: 15,
-  sessionsBeforeLongBreak: 4,
-};
+export { DEFAULT_POMODORO_SETTINGS };
 
 /**
  * Custom hook for the Pomodoro timer engine.
@@ -25,12 +21,23 @@ export const DEFAULT_POMODORO_SETTINGS = {
  * - Manual skip to next phase
  * - Configurable durations via pomodoroSettings
  */
-export function useTimer({ activeSubject, onTickFocus, onSessionComplete, pomodoroSettings }) {
+export function useTimer({
+  activeSubject,
+  onTickFocus,
+  onSessionComplete,
+  pomodoroSettings,
+  notificationSettings,
+  variant = 'pomodoro',
+}) {
   // Merge custom settings with defaults
   const settings = useMemo(() => ({
     ...DEFAULT_POMODORO_SETTINGS,
     ...pomodoroSettings,
   }), [pomodoroSettings]);
+  const effectiveNotificationSettings = useMemo(() => ({
+    ...DEFAULT_NOTIFICATION_SETTINGS,
+    ...notificationSettings,
+  }), [notificationSettings]);
 
   const [timerMode, setTimerMode] = useState('focus');
   const [completedSessions, setCompletedSessions] = useState(0);
@@ -48,6 +55,7 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete, pomodo
   const onSessionCompleteRef = useRef(onSessionComplete);
   const completedSessionsRef = useRef(completedSessions);
   const settingsRef = useRef(settings);
+  const notificationSettingsRef = useRef(effectiveNotificationSettings);
   const advanceTimeoutRef = useRef(null); // For cleaning up the auto-advance setTimeout
 
   timerModeRef.current = timerMode;
@@ -56,6 +64,7 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete, pomodo
   onSessionCompleteRef.current = onSessionComplete;
   completedSessionsRef.current = completedSessions;
   settingsRef.current = settings;
+  notificationSettingsRef.current = effectiveNotificationSettings;
 
   // Cleanup advance timeout on unmount
   useEffect(() => {
@@ -98,6 +107,10 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete, pomodo
    * Short Break / Long Break → Focus
    */
   const getNextMode = useCallback((currentMode, sessionsCompleted) => {
+    if (variant === 'focusOnly') {
+      return { mode: 'focus', sessions: sessionsCompleted };
+    }
+
     if (currentMode === 'focus') {
       const newCompleted = sessionsCompleted + 1;
       if (newCompleted >= settingsRef.current.sessionsBeforeLongBreak) {
@@ -111,14 +124,13 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete, pomodo
     }
     // After short break, go back to focus
     return { mode: 'focus', sessions: sessionsCompleted };
-  }, []);
+  }, [variant]);
 
-  /**
-   * Switches to the next Pomodoro phase after timer completion.
-   * Timer is stopped and ready for user to press start.
-   */
-  const advanceToNextPhase = useCallback((currentMode, sessionsCompleted) => {
-    const { mode: nextMode, sessions: nextSessions } = getNextMode(currentMode, sessionsCompleted);
+  const applyPhaseState = useCallback((nextMode, nextSessions, options = {}) => {
+    const {
+      keepCompletionBanner = false,
+      autoStart = false,
+    } = options;
     const newTime = getDurationForMode(nextMode);
 
     setTimerMode(nextMode);
@@ -126,8 +138,22 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete, pomodo
     setTimeLeft(newTime);
     setTotalTimerSeconds(newTime);
     setIsPaused(false);
-    // Keep timerComplete true so the banner stays visible until user starts next phase
-  }, [getNextMode, getDurationForMode]);
+    setIsRunning(autoStart);
+    setTimerComplete(keepCompletionBanner);
+
+    if (!keepCompletionBanner) {
+      setLastCompletedMode(null);
+    }
+  }, [getDurationForMode]);
+
+  /**
+   * Switches to the next Pomodoro phase after timer completion.
+   * Timer is stopped and ready for user to press start unless autoStart is requested.
+   */
+  const advanceToNextPhase = useCallback((currentMode, sessionsCompleted, options = {}) => {
+    const { mode: nextMode, sessions: nextSessions } = getNextMode(currentMode, sessionsCompleted);
+    applyPhaseState(nextMode, nextSessions, options);
+  }, [applyPhaseState, getNextMode]);
 
   // Core timer engine — safe against tab throttling
   useEffect(() => {
@@ -157,7 +183,6 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete, pomodo
         setIsPaused(false);
         setTimerComplete(true);
         setLastCompletedMode(currentMode);
-        playNotificationSound();
 
         // Record study time and session completion for focus mode
         if (currentMode === 'focus' && activeSubjectRef.current) {
@@ -165,9 +190,18 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete, pomodo
           onSessionCompleteRef.current?.();
         }
 
+        const isBreakMode = currentMode === 'shortBreak' || currentMode === 'longBreak';
+        const shouldPlaySound = notificationSettingsRef.current.soundEnabled;
+        const shouldShowNotification = isBreakMode
+          ? notificationSettingsRef.current.breakEndNotification
+          : notificationSettingsRef.current.sessionEndNotification;
+
+        if (shouldPlaySound) {
+          playNotificationSound();
+        }
+
         // Browser notification
-        if ('Notification' in window && Notification.permission === 'granted') {
-          const isBreakMode = currentMode === 'shortBreak' || currentMode === 'longBreak';
+        if (shouldShowNotification && 'Notification' in window && Notification.permission === 'granted') {
           new Notification('⏰ انتهى الوقت!', {
             body: isBreakMode
               ? 'انتهت فترة الراحة، استعد للدراسة!'
@@ -182,10 +216,10 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete, pomodo
 
         // Auto-advance to the next phase after a short delay
         // so the user sees the completion banner briefly
-        advanceTimeoutRef.current = setTimeout(() => {
-          advanceTimeoutRef.current = null;
-          advanceToNextPhase(currentMode, completedSessionsRef.current);
-        }, 1500);
+          advanceTimeoutRef.current = setTimeout(() => {
+            advanceTimeoutRef.current = null;
+            advanceToNextPhase(currentMode, completedSessionsRef.current, { keepCompletionBanner: true });
+          }, 1500);
       } else {
         // Timer still running — update display and track focus time
         setTimeLeft(nextTimeLeft);
@@ -207,21 +241,36 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete, pomodo
     if (!activeSubject) return;
     
     // Request notification permission on first interaction
-    if ('Notification' in window && Notification.permission === 'default') {
+    const shouldRequestNotificationPermission = notificationSettingsRef.current.sessionEndNotification
+      || notificationSettingsRef.current.breakEndNotification;
+
+    if (
+      shouldRequestNotificationPermission
+      && 'Notification' in window
+      && Notification.permission === 'default'
+    ) {
       Notification.requestPermission();
     }
+
+    const hadPendingAdvance = Boolean(advanceTimeoutRef.current);
 
     // Cancel any pending auto-advance if user starts manually
     if (advanceTimeoutRef.current) {
       clearTimeout(advanceTimeoutRef.current);
       advanceTimeoutRef.current = null;
     }
+
+    if ((timerComplete || hadPendingAdvance) && timeLeft <= 0) {
+      advanceToNextPhase(timerModeRef.current, completedSessionsRef.current, { autoStart: true });
+      setLastCompletedMode(null);
+      return;
+    }
     
     setTimerComplete(false);
     setLastCompletedMode(null);
     setIsPaused(false);
     setIsRunning(true);
-  }, [activeSubject]);
+  }, [activeSubject, advanceToNextPhase, timeLeft, timerComplete]);
 
   /**
    * Pause the timer. Time is preserved for resume.
@@ -307,7 +356,10 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete, pomodo
     let nextMode;
     let nextSessions;
 
-    if (currentMode === 'focus') {
+    if (variant === 'focusOnly') {
+      nextMode = 'focus';
+      nextSessions = currentSessions;
+    } else if (currentMode === 'focus') {
       nextMode = 'shortBreak';
       nextSessions = currentSessions;
     } else {
@@ -316,13 +368,8 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete, pomodo
       nextSessions = nextPhase.sessions;
     }
 
-    const newTime = getDurationForMode(nextMode);
-
-    setTimerMode(nextMode);
-    setCompletedSessions(nextSessions);
-    setTimeLeft(newTime);
-    setTotalTimerSeconds(newTime);
-  }, [getNextMode, getDurationForMode]);
+    applyPhaseState(nextMode, nextSessions);
+  }, [applyPhaseState, getNextMode, variant]);
 
   /**
    * Reset the entire Pomodoro cycle (sessions counter + go back to focus).
