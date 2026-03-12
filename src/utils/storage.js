@@ -76,6 +76,7 @@ export async function saveUserData(uid, data) {
       dailyLog: data.dailyLog || {},
       dailyGoal: data.dailyGoal || 3,
       userProfile: data.userProfile || {},
+      pomodoroSettings: data.pomodoroSettings || {},
       updatedAt: serverTimestamp(),
     });
   } catch (err) {

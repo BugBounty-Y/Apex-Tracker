@@ -150,14 +150,14 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete, pomodo
         const previousTimeLeft = Math.max(0, Math.round((endTime - (now - rawElapsed * 1000)) / 1000));
         const finalSeconds = Math.min(rawElapsed, previousTimeLeft);
 
+        const currentMode = timerModeRef.current;
+
         setTimeLeft(0);
         setIsRunning(false);
         setIsPaused(false);
         setTimerComplete(true);
         setLastCompletedMode(currentMode);
         playNotificationSound();
-
-        const currentMode = timerModeRef.current;
 
         // Record study time and session completion for focus mode
         if (currentMode === 'focus' && activeSubjectRef.current) {
