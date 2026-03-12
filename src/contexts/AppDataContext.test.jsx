@@ -146,6 +146,7 @@ describe('AppDataProvider', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     cleanup();
   });
 
@@ -253,5 +254,120 @@ describe('AppDataProvider', () => {
     });
 
     expect(saveUserDataMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('restores a paused stopwatch session from persisted local state', async () => {
+    const fixedNow = 1_800_000_000_000;
+    const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(fixedNow);
+
+    localStorage.setItem('apex-tracker-active-study:user-1', JSON.stringify({
+      version: 1,
+      persistedAt: fixedNow,
+      activeSubject: 'Math',
+      activeTaskId: '',
+      timerPreset: 'stopwatch',
+      sessionDraft: {
+        id: 'session-1',
+        subject: 'Math',
+        taskId: '',
+        taskTitle: '',
+        startedAt: '2026-03-13T10:00:00.000Z',
+        startedAtMs: fixedNow - 120000,
+        durationSeconds: 120,
+        mode: 'stopwatch',
+        type: 'stopwatch',
+      },
+      stopwatch: {
+        elapsedSeconds: 120,
+        isRunning: false,
+        isPaused: true,
+      },
+      focusTimer: null,
+    }));
+
+    loadOrMigrateUserDataMock.mockResolvedValue({
+      subjects: {
+        Math: { goalHours: 10, studiedSeconds: 120, sessions: 0, color: 'bg-blue-50 text-blue-900', tasks: [] },
+      },
+      dailyLog: { '2026-03-13': 120 },
+      studySessions: [],
+      userProfile: {
+        name: 'Yahya',
+        examDate: '2026-06-20',
+        timezone: 'Africa/Cairo',
+        hasCompletedOnboarding: true,
+      },
+      pomodoroSettings: {},
+    });
+
+    render(
+      <AppDataProvider>
+        <ContextCapture />
+      </AppDataProvider>,
+    );
+
+    await waitFor(() => {
+      expect(capturedContext?.timerPreset).toBe('stopwatch');
+    });
+
+    expect(capturedContext.activeSubject).toBe('Math');
+    expect(capturedContext.timerState.displaySeconds).toBe(120);
+    expect(capturedContext.timerState.isPaused).toBe(true);
+    expect(capturedContext.timerState.isRunning).toBe(false);
+
+    dateNowSpy.mockRestore();
+  });
+
+  it('rebuilds daily log buckets when the user changes timezone', async () => {
+    loadOrMigrateUserDataMock.mockResolvedValue({
+      subjects: {
+        Math: { goalHours: 10, studiedSeconds: 5, sessions: 1, color: 'bg-blue-50 text-blue-900', tasks: [] },
+      },
+      dailyLog: {
+        '2026-03-12': 2,
+        '2026-03-13': 3,
+      },
+      studySessions: [
+        {
+          id: 'session-1',
+          subject: 'Math',
+          startedAt: '2026-03-12T14:59:58.000Z',
+          endedAt: '2026-03-12T15:00:03.000Z',
+          durationSeconds: 5,
+          type: 'focus',
+          completed: true,
+          mode: 'pomodoro',
+        },
+      ],
+      userProfile: {
+        name: 'Yahya',
+        examDate: '2026-06-20',
+        timezone: 'Asia/Tokyo',
+        hasCompletedOnboarding: true,
+      },
+      pomodoroSettings: {},
+    });
+
+    render(
+      <AppDataProvider>
+        <ContextCapture />
+      </AppDataProvider>,
+    );
+
+    await waitFor(() => {
+      expect(capturedContext?.appData.userProfile.timezone).toBe('Asia/Tokyo');
+    });
+
+    act(() => {
+      capturedContext.updateProfile({ timezone: 'America/New_York' });
+    });
+
+    await waitFor(() => {
+      expect(capturedContext?.appData.userProfile.timezone).toBe('America/New_York');
+    });
+
+    expect(capturedContext.appData.dailyLog).toEqual({
+      '2026-03-12': 5,
+    });
   });
 });

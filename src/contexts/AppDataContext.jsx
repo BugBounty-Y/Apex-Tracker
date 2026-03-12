@@ -134,6 +134,7 @@ export function AppDataProvider({ children }) {
   const saveInFlightRef = useRef(false);
   const saveQueuedRef = useRef(false);
   const savePromiseRef = useRef(null);
+  const lastUserUidRef = useRef(user?.uid || null);
   const stopwatchLastTickAtRef = useRef(null);
   const stopwatchTickRemainderMsRef = useRef(0);
 
@@ -145,6 +146,12 @@ export function AppDataProvider({ children }) {
     activeSubjectRef.current = activeSubject;
     activeTaskIdRef.current = activeTaskId;
   }, [activeSubject, activeTaskId]);
+
+  useEffect(() => {
+    if (user?.uid) {
+      lastUserUidRef.current = user.uid;
+    }
+  }, [user?.uid]);
 
   useEffect(() => {
     const handleOnline = () => {
@@ -488,7 +495,7 @@ export function AppDataProvider({ children }) {
       stopwatchLastTickAtRef.current = null;
       stopwatchTickRemainderMsRef.current = 0;
       sessionDraftRef.current = null;
-      clearStoredActiveStudyState(user?.uid);
+      clearStoredActiveStudyState(lastUserUidRef.current);
       return;
     }
 

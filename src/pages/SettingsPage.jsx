@@ -436,6 +436,15 @@ export default function SettingsPage() {
           <NumberField label="Weekly" value={goalsForm.weeklyHours} min={1} max={200} suffix="h" onChange={(event) => setGoalsForm((currentValue) => ({ ...currentValue, weeklyHours: event.target.value }))} />
           <NumberField label="Monthly" value={goalsForm.monthlyHours} min={1} max={800} suffix="h" onChange={(event) => setGoalsForm((currentValue) => ({ ...currentValue, monthlyHours: event.target.value }))} />
         </div>
+        <div className="mt-4">
+          <ToggleRow
+            icon={<Icons.Coffee />}
+            title="Auto-start breaks"
+            description="Starts the next break automatically after a completed focus session."
+            checked={pomodoroForm.autoStartBreaks}
+            onChange={(event) => setPomodoroForm((currentValue) => ({ ...currentValue, autoStartBreaks: event.target.checked }))}
+          />
+        </div>
         <div className="mt-5">
           <button type="button" onClick={handleSaveGoals} className="app-btn-primary">حفظ الأهداف</button>
         </div>

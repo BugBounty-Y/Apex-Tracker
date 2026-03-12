@@ -247,6 +247,8 @@ export function mergeAppDataSnapshots(currentData, incomingData, options = {}) {
     );
     const availableTaskIds = new Set(mergedTasks.map((task) => task.id).filter(Boolean));
     const hasSessionData = subjectsWithSessionData.has(subjectName);
+    const sessionDerivedStudiedSeconds = metrics?.studiedSeconds || 0;
+    const sessionDerivedSessions = metrics?.sessions || 0;
 
     mergedSubjects[subjectName] = {
       ...(fallbackSubject || {}),
@@ -256,10 +258,18 @@ export function mergeAppDataSnapshots(currentData, incomingData, options = {}) {
       tasks: mergedTasks,
       notes: mergeNotes(currentSubject?.notes || '', incomingSubject?.notes || ''),
       studiedSeconds: hasSessionData
-        ? metrics.studiedSeconds
+        ? Math.max(
+            currentSubject?.studiedSeconds || 0,
+            incomingSubject?.studiedSeconds || 0,
+            sessionDerivedStudiedSeconds,
+          )
         : Math.max(currentSubject?.studiedSeconds || 0, incomingSubject?.studiedSeconds || 0),
       sessions: hasSessionData
-        ? metrics.sessions
+        ? Math.max(
+            currentSubject?.sessions || 0,
+            incomingSubject?.sessions || 0,
+            sessionDerivedSessions,
+          )
         : Math.max(currentSubject?.sessions || 0, incomingSubject?.sessions || 0),
       lastSessionAt: metrics?.lastSessionAt
         || incomingSubject?.lastSessionAt
