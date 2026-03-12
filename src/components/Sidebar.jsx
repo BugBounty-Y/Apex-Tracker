@@ -20,7 +20,6 @@ export default function Sidebar({
   const navItems = [
     { id: 'dashboard', label: 'لوحة التحكم', icon: <Icons.Home />, desc: 'نظرة عامة' },
     { id: 'timer', label: 'المؤقت', icon: <Icons.Timer />, desc: 'بومودورو' },
-    { id: 'settings', label: 'الإعدادات', icon: <Icons.Settings />, desc: 'إعدادات الحساب' },
   ];
 
   return (
@@ -39,15 +38,21 @@ export default function Sidebar({
           <div className="flex items-center justify-between">
             <button
               onClick={() => onNavigate('settings')}
-              className="flex items-center gap-3.5 group transition-all hover:opacity-80"
-              title="الإعدادات"
+              className={`flex items-center gap-3.5 group transition-all p-2 -mr-2 rounded-2xl hover:bg-violet-500/10 active:scale-95 ${currentView === 'settings' ? 'bg-violet-500/10 ring-1 ring-violet-500/20' : ''}`}
+              title="الإعدادات الشخصية"
             >
-              <div className="w-11 h-11 bg-gradient-to-br from-violet-600 to-violet-500 rounded-2xl flex items-center justify-center shadow-lg shadow-violet-600/20 transition-transform group-hover:scale-105">
-                <span className="text-white font-black text-base">{studentInitial}</span>
+              <div className="w-11 h-11 bg-gradient-to-br from-violet-600 to-violet-500 rounded-2xl flex items-center justify-center shadow-lg shadow-violet-600/20 transition-all duration-300 group-hover:scale-105 group-hover:-rotate-3 relative overflow-hidden">
+                <span className="text-white font-black text-base relative z-10 transition-transform duration-300 group-hover:scale-0">{studentInitial}</span>
+                <div className="absolute inset-0 bg-violet-700/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 flex items-center justify-center text-white/90">
+                  <div className="scale-75"><Icons.Settings /></div>
+                </div>
               </div>
-              <div>
-                <h1 className="text-[15px] font-bold tracking-tight" style={{ color: 'var(--c-text)' }}>{studentName}</h1>
-                <p className="text-[11px] font-medium mt-0.5" style={{ color: 'var(--c-text-faint)' }}>Apex Tracker</p>
+              <div className="text-right">
+                <h1 className={`text-[15px] font-bold tracking-tight transition-colors ${currentView === 'settings' ? 'text-violet-500' : ''}`} style={currentView === 'settings' ? {} : { color: 'var(--c-text)' }}>{studentName}</h1>
+                <p className="text-[11px] font-medium mt-0.5 flex items-center gap-1" style={{ color: 'var(--c-text-faint)' }}>
+                  إعدادات الحساب
+                  <span className="scale-75"><Icons.ChevronDown /></span>
+                </p>
               </div>
             </button>
             {/* Theme Toggle */}
@@ -179,11 +184,19 @@ export default function Sidebar({
         style={{ backgroundColor: isDark ? 'rgba(9,9,11,0.95)' : 'rgba(245,245,247,0.95)', borderColor: 'var(--c-border)' }}
       >
         <div className="flex items-center gap-3">
-          <button onClick={() => onNavigate('settings')} className="flex items-center gap-3 group">
-            <div className="w-9 h-9 bg-gradient-to-br from-violet-600 to-violet-500 rounded-xl flex items-center justify-center shadow-lg shadow-violet-600/20">
-              <span className="text-white font-black text-sm">{studentInitial}</span>
+          <button onClick={() => onNavigate('settings')} className={`flex items-center gap-3 group p-1.5 -mr-1.5 rounded-xl transition-all active:scale-95 ${currentView === 'settings' ? 'bg-violet-500/10 ring-1 ring-violet-500/20' : ''}`}>
+            <div className="w-9 h-9 bg-gradient-to-br from-violet-600 to-violet-500 rounded-xl flex items-center justify-center shadow-lg shadow-violet-600/20 relative overflow-hidden">
+              <span className="text-white font-black text-sm relative z-10 transition-transform group-hover:scale-0">{studentInitial}</span>
+              <div className="absolute inset-0 bg-violet-700/50 opacity-0 group-hover:opacity-100 transition-opacity z-20 flex items-center justify-center">
+                <div className="scale-75 text-white/90">
+                  <Icons.Settings />
+                </div>
+              </div>
             </div>
-            <div className="text-sm font-bold" style={{ color: 'var(--c-text)' }}>{studentName}</div>
+            <div className={`text-sm font-bold flex items-center gap-0.5 transition-colors ${currentView === 'settings' ? 'text-violet-500' : ''}`} style={currentView === 'settings' ? {} : { color: 'var(--c-text)' }}>
+              {studentName}
+              <div className="text-violet-500/50 transform scale-75 group-hover:text-violet-500 transition-colors"><Icons.ChevronDown /></div>
+            </div>
           </button>
         </div>
         <div className="flex items-center gap-2">
