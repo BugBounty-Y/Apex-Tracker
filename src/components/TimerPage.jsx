@@ -105,9 +105,8 @@ export default function TimerPage({
                 key={mode}
                 onClick={() => changeMode(mode)}
                 aria-label={label}
-                className={`w-full p-3 rounded-xl flex items-center justify-between transition-all ${
-                  timerMode === mode ? 'ring-1 ring-violet-500/30' : ''
-                }`}
+                className={`w-full p-3 rounded-xl flex items-center justify-between transition-all ${timerMode === mode ? 'ring-1 ring-violet-500/30' : ''
+                  }`}
                 style={{
                   backgroundColor: timerMode === mode ? 'var(--c-elevated)' : 'transparent',
                 }}
@@ -209,14 +208,13 @@ export default function TimerPage({
                     <button
                       onClick={toggleTimer}
                       aria-label={isRunning ? 'إيقاف المؤقت' : 'بدء المؤقت'}
-                      className={`px-8 py-3.5 flex-1 max-w-[200px] flex items-center justify-center gap-3 rounded-full text-white text-base font-semibold transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg ${
-                        isRunning
+                      className={`px-8 py-3.5 flex-1 max-w-[200px] flex items-center justify-center gap-3 rounded-full text-white text-base font-semibold transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg ${isRunning
                           ? 'bg-zinc-700 hover:bg-zinc-600 text-red-400 shadow-black/20'
                           : `${timerTheme.bg} ${timerTheme.glow}`
-                      }`}
+                        }`}
                     >
                       {isRunning ? <Icons.Pause /> : <Icons.Play />}
-                      {isRunning ? 'إيقاف' : 'بدء التركيز'}
+                      {isRunning ? 'إيقاف' : 'بدء المؤقت'}
                     </button>
                   </div>
                 </>
