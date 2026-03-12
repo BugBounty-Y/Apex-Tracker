@@ -257,15 +257,17 @@ function AppInner() {
   // ==========================================
 
   const handleSelectSubject = (subj, navigateToTimer = false) => {
-    if ((timer.isRunning || timer.isPaused) && activeSubject && activeSubject !== subj) {
+    const wasRunningOrPaused = timer.isRunning || timer.isPaused;
+    if (wasRunningOrPaused && activeSubject && activeSubject !== subj) {
       if (!window.confirm(`المؤقت يعمل حالياً على "${activeSubject}". هل تريد التبديل إلى "${subj}"؟`)) {
         return;
       }
-      timer.resetTimer();
     }
     const isNewSubject = activeSubject !== subj;
-    setActiveSubject(subj);
-    if (!timer.isRunning && !timer.isPaused && isNewSubject) timer.changeMode('focus');
+    if (isNewSubject) {
+      setActiveSubject(subj);
+      timer.resetCycle();
+    }
     if (navigateToTimer) setCurrentView('timer');
   };
 

@@ -101,11 +101,15 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete, pomodo
     if (currentMode === 'focus') {
       const newCompleted = sessionsCompleted + 1;
       if (newCompleted >= settingsRef.current.sessionsBeforeLongBreak) {
-        return { mode: 'longBreak', sessions: 0 }; // Reset cycle
+        return { mode: 'longBreak', sessions: newCompleted }; // Don't reset yet so UI shows full dots during break
       }
       return { mode: 'shortBreak', sessions: newCompleted };
     }
-    // After any break, go back to focus
+    // After long break finishes, reset the cycle back to 0
+    if (currentMode === 'longBreak') {
+      return { mode: 'focus', sessions: 0 };
+    }
+    // After short break, go back to focus
     return { mode: 'focus', sessions: sessionsCompleted };
   }, []);
 
@@ -301,20 +305,14 @@ export function useTimer({ activeSubject, onTickFocus, onSessionComplete, pomodo
     const currentMode = timerModeRef.current;
     const currentSessions = completedSessionsRef.current;
 
-    if (currentMode === 'focus') {
-      // Skipping focus session — don't count it as completed
-      const { mode: nextMode } = getNextMode(currentMode, currentSessions);
-      const newTime = getDurationForMode(nextMode);
-      setTimerMode(nextMode);
-      setTimeLeft(newTime);
-      setTotalTimerSeconds(newTime);
-    } else {
-      // Skipping break → go to focus
-      const newTime = getDurationForMode('focus');
-      setTimerMode('focus');
-      setTimeLeft(newTime);
-      setTotalTimerSeconds(newTime);
-    }
+    // Use getNextMode to seamlessly determine the next phase and update session counts
+    const { mode: nextMode, sessions: nextSessions } = getNextMode(currentMode, currentSessions);
+    const newTime = getDurationForMode(nextMode);
+
+    setTimerMode(nextMode);
+    setCompletedSessions(nextSessions);
+    setTimeLeft(newTime);
+    setTotalTimerSeconds(newTime);
   }, [getNextMode, getDurationForMode]);
 
   /**
